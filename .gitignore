@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.certs/
+src/core/installer/bundled-artifacts.generated.ts
+
+# use yarn — do not commit an npm lockfile
+package-lock.json

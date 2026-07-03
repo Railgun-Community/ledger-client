@@ -1,0 +1,74 @@
+{
+  "name": "@railgun-community/ledger-client",
+  "version": "0.1.1",
+  "description": "RAILGUN hardware wallet connector — Ledger-first, state-machine-driven TSX component",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "embed:artifacts": "tsx scripts/embed-artifacts.ts",
+    "prebuild": "tsx scripts/embed-artifacts.ts",
+    "build": "tsc",
+    "prepack": "yarn build",
+    "prepare": "tsx scripts/embed-artifacts.ts && tsc",
+    "typecheck": "tsx scripts/embed-artifacts.ts && tsc --noEmit",
+    "lint": "eslint src/ test/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "release:patch": "bash scripts/release.sh patch",
+    "release:minor": "bash scripts/release.sh minor",
+    "release:major": "bash scripts/release.sh major",
+    "install:app": "tsx scripts/install-app.ts",
+    "install:app:flex": "tsx scripts/install-app.ts --target flex --scp",
+    "install:app:nanosp": "tsx scripts/install-app.ts --target nanosp --scp"
+  },
+  "devDependencies": {
+    "@ledgerhq/hw-app-btc": "^10.4.0",
+    "@ledgerhq/hw-app-eth": "^6.41.0",
+    "@ledgerhq/hw-transport": "^6.31.0",
+    "@ledgerhq/hw-transport-node-hid": "^6.32.1",
+    "@ledgerhq/hw-transport-webhid": "^6.30.0",
+    "eslint": "^9.0.0",
+    "jiti": "^2.7.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
+    "@railgun-community/circomlibjs": "^0.0.8"
+  },
+  "peerDependencies": {
+    "@ledgerhq/hw-app-eth": "^6.41.0",
+    "@ledgerhq/hw-transport": "^6.31.0",
+    "@ledgerhq/hw-transport-webhid": "^6.30.0"
+  },
+  "peerDependenciesMeta": {
+    "@ledgerhq/hw-app-eth": {
+      "optional": true
+    },
+    "@ledgerhq/hw-transport-webhid": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

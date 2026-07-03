@@ -1,0 +1,54 @@
+name: Release
+
+# Push a version bump to the `release` branch to cut a release: this packs the
+# package and publishes a GitHub Release (tag v<version>) with the tarball.
+# If v<version> is already tagged, the run is a no-op — bump the version first.
+on:
+  push:
+    branches: [release]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: pkg
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          NAME="$(node -p "require('./package.json').name.replace('@','').replaceAll('/','-')")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tarball=$NAME-$VERSION.tgz" >> "$GITHUB_OUTPUT"
+          if git ls-remote --tags origin "refs/tags/v$VERSION" | grep -q .; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$VERSION is already tagged — nothing to release. Bump the version to publish."
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.pkg.outputs.release == 'true'
+        with:
+          node-version: 20
+          cache: yarn
+
+      - if: steps.pkg.outputs.release == 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Pack
+        if: steps.pkg.outputs.release == 'true'
+        run: yarn pack --filename ${{ steps.pkg.outputs.tarball }}
+
+      - name: Publish GitHub Release
+        if: steps.pkg.outputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pkg.outputs.version }}
+          name: v${{ steps.pkg.outputs.version }}
+          files: ${{ steps.pkg.outputs.tarball }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
