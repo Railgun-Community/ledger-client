@@ -92,4 +92,6 @@ Responsibilities:
 
 - the default modal host is intentionally minimal and should be treated as a safe default, not final product UX
 - batch approval sessions are implemented in the SDK, but engine-side adoption of the richer session-based contract still needs to happen in the engine repo
-- installer flows are not integrated into the SDK provider surface; they remain part of the existing component/UI layer
+- installer flows are not integrated into the SDK provider surface; drive them with `installApp` plus the `yarn keygen` + attestation flow (see [INSTALLER-KEYS.md](./INSTALLER-KEYS.md))
+- no installer root key is bundled — the integrating wallet developer generates and injects one; an SCP install with no key fails fast
+- the whole surface is experimental; FROST/MPC is unsupported on current firmware; EIP-7702 signing is under development (see `CAPABILITY_STATUS`)

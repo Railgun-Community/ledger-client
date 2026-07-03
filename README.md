@@ -13,6 +13,23 @@ State-machine-driven hardware wallet connector for RAILGUN — Ledger-first, bro
 - Exposes a `HardwareConnector` interface compatible with the RAILGUN engine
 - Drives its behavior through a pure finite state machine — no framework required
 
+## Status
+
+**Experimental / pre-1.0.** APIs and on-disk formats may change without a major version
+bump. Two surfaces carry a stronger caveat:
+
+- **FROST / MPC** signing is **unsupported** — the command builders exist in the API, but
+  the live RAILGUN app does not implement FROST yet.
+- **EIP-7702** authorization + RelayAdapt7702 signing is **under development**.
+
+A machine-readable version of these markers is exported:
+
+```ts
+import { CAPABILITY_STATUS } from '@railgun-community/ledger-client';
+// { installer: 'experimental', keyAttestation: 'experimental',
+//   frost: 'unsupported', eip7702: 'under-development', ... }
+```
+
 ## Installing (pre-release)
 
 Not on npm yet. Until the npm release flow is set up, install it straight from
@@ -72,7 +89,35 @@ yarn build       # emit dist/
 yarn pack        # produce the package bundle
 ```
 
-## RAILGUN 7702 Hardware Signing
+## Installing the RAILGUN app onto a device (SCP + root keys)
+
+The package can sideload the RAILGUN app onto a Ledger over an SCP secure channel.
+**No signing key is bundled** — as the integrating wallet developer you generate your own
+*installer root key* and inject it. Its public half is what the Ledger shows during
+*"Allow unsafe manager"*, and you publish a self-signed attestation so your users can
+verify it.
+
+```bash
+# generate a root key + a publishable attestation
+yarn keygen --attestation ./attestation.json --name "Acme Wallet" --url https://acme.example
+
+# install, injecting your key (never bundled)
+yarn install:app -- --target flex --scp --rootKeyFile .certs/installer-root.key
+```
+
+```ts
+import { installApp, loadBundledInstallArtifact } from '@railgun-community/ledger-client';
+
+const { apduData, elfData } = loadBundledInstallArtifact('flex');
+await installApp(transport, { apduData, elfData, rootPrivateKey, scp: true });
+```
+
+An SCP install with no injected key fails fast with a clear error. See
+**[docs/INSTALLER-KEYS.md](docs/INSTALLER-KEYS.md)** for the full walkthrough — key
+generation, custody, the attestation format, verification, and binding an attestation to
+specific app builds.
+
+## RAILGUN 7702 Hardware Signing (under development)
 
 The SDK exposes the RAILGUN-app hardware path for EIP-7702 signer preload, authorization signing, and RelayAdapt7702 EIP-712 digest signing. The firmware derives Ethereum EOAs from:
 
@@ -148,7 +193,10 @@ All public types and functions are re-exported from `src/index.ts`. Key exports:
 | `createEngineLedgerConnector` | Session-aware engine adapter with shield and ETH tx signing hooks |
 | `RailgunSigner.get7702Signer` | Direct engine-compatible 7702 signer from a RAILGUN app signer |
 | `createRailgun7702SignerProvider` | Engine ephemeral signer provider for 7702 wallet migrations |
-| `installApp` | SCP-based app installer |
+| `installApp` | SCP-based app installer — inject your own root key (experimental) |
+| `generateInstallerKeypair` | Generate an installer root keypair (experimental) |
+| `buildKeyAttestation`, `verifyKeyAttestation` | Build/verify a self-signed key attestation (experimental) |
+| `CAPABILITY_STATUS` | Machine-readable experimental / unsupported status map |
 | `createTransport`, `WebHIDTransport` | Transport layer |
 | `validatePublicInputs`, `validateManifest` | Trust-boundary validators |
 
