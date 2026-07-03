@@ -44,13 +44,29 @@ async function main(): Promise<void> {
   const elfData = elfPath !== undefined ? new Uint8Array(fs.readFileSync(elfPath)) : undefined;
   const appName = extractAppName(apduData) ?? 'RAILGUN';
 
+  // No key is bundled — inject via --rootKeyFile or LEDGER_ROOT_PRIVATE_KEY.
+  const rootKeyFile = getArg('--rootKeyFile');
+  const rootKeyHex =
+    rootKeyFile !== undefined
+      ? fs.readFileSync(rootKeyFile, 'utf8').trim()
+      : process.env.LEDGER_ROOT_PRIVATE_KEY;
+  if (rootKeyHex === undefined || rootKeyHex.length === 0) {
+    console.error(
+      'No root key. Pass --rootKeyFile <path> or set LEDGER_ROOT_PRIVATE_KEY (generate one with `yarn keygen`).',
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const { ensurePrivateKey32 } = await import('../src/core/installer/crypto.js');
+  const rootPrivateKey = ensurePrivateKey32(rootKeyHex);
+
   console.log('╔══════════════════════════════════════════╗');
   console.log('║   ledger-client — Install + Verify Test  ║');
   console.log('╚══════════════════════════════════════════╝\n');
   console.log(`  APDU:     ${apduPath} (${apduData.length} chars)`);
   console.log(`  ELF:      ${elfPath ?? '(none)'}`);
   console.log(`  App name: ${appName}`);
-  console.log(`  Key env:  dev\n`);
+  console.log(`  Root key: ${rootKeyFile ?? 'env LEDGER_ROOT_PRIVATE_KEY'}\n`);
 
   const transport = new NodeHIDTransport(60_000);
 
@@ -68,7 +84,7 @@ async function main(): Promise<void> {
       {
         apduData,
         elfData,
-        keyEnvironment: 'dev',
+        rootPrivateKey,
         scp: true,
         prime: true,
       },

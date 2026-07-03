@@ -12,6 +12,8 @@ This directory documents the browser-wallet SDK surface built on top of the core
   - engine adapter contract and multi-sig batch approval semantics
 - [sdk-examples.md](./sdk-examples.md)
   - practical usage examples for wallet developers
+- [INSTALLER-KEYS.md](./INSTALLER-KEYS.md)
+  - installer root-key generation, injection, and the key-attestation flow (experimental)
 
 ## SDK surface
 

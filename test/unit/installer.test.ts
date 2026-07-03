@@ -19,9 +19,7 @@ import {
   parseLv,
 } from '../../src/core/installer/crypto.js';
 import { ScpV2Session, ScpV3Session } from '../../src/core/installer/scp.js';
-import { getRootKey } from '../../src/core/installer/keys.js';
 import { loadBundledInstallArtifact } from '../../src/core/installer/bundled-artifacts.js';
-import type { KeyEnvironment } from '../../src/core/installer/types.js';
 import {
   TRANSIENT_STATUS_WORDS,
   STATUS_HINTS,
@@ -605,24 +603,6 @@ describe('SCP sessions', () => {
         expect(unwrapped).toEqual(data);
       }
     });
-  });
-});
-
-// ─── Keys ────────────────────────────────────────────────────────────────────
-
-describe('root keys', () => {
-  it('should return 32-byte dev key', () => {
-    const key = getRootKey('dev');
-    expect(key.length).toBe(32);
-  });
-
-  it('should return 32-byte prod key', () => {
-    const key = getRootKey('prod');
-    expect(key.length).toBe(32);
-  });
-
-  it('should throw for unknown environment', () => {
-    expect(() => getRootKey('staging' as KeyEnvironment)).toThrow('Unknown key environment');
   });
 });
 

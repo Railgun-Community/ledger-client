@@ -43,9 +43,6 @@ export const MAX_MANIFEST_SIZE = 10 * 1024;
 
 // ─── SCP Install Configuration ──────────────────────────────────────────────
 
-/** Root key environment selector. */
-export type KeyEnvironment = 'prod' | 'dev';
-
 /** Configuration for a single SCP-based install operation. */
 export type InstallConfig = {
   /** Raw .apdu file contents (hex lines, one APDU per line). */
@@ -54,10 +51,12 @@ export type InstallConfig = {
   readonly elfData?: Uint8Array;
   /** Target device ID. Used if elfData is not provided. Default: 0x33100004 (Nano S Plus). */
   readonly targetId?: number;
-  /** Root private key (32 bytes). Overrides environment key when present. */
+  /**
+   * Root private key (32 bytes). Required for SCP installs — the integrator
+   * generates and injects it (`yarn keygen` / `generateInstallerKeypair`); no
+   * key is bundled. Optional only for non-SCP (`scp: false`) dry runs.
+   */
   readonly rootPrivateKey?: Uint8Array;
-  /** Key environment to use when rootPrivateKey is not provided. Default: 'dev'. */
-  readonly keyEnvironment?: KeyEnvironment;
   /** Enable SCP wrapping (required for real installs). Default: true. */
   readonly scp?: boolean;
   /** Prime the device before install. Default: true. */

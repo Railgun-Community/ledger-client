@@ -120,7 +120,7 @@ const shieldSignature = await connector.signShieldOwnershipMarker(0);
 const submitTxSignature = await connector.signEthTransaction(rawTxHex, 0);
 ```
 
-## App-Native EIP-7702 APDUs
+## App-Native EIP-7702 APDUs (under development)
 
 ```ts
 import { RailgunSigner } from '@railgun-community/ledger-client';
@@ -189,3 +189,35 @@ const controller = createLedgerController({
 ```
 
 This is the supported way to unit-test the controller layer without browser WebHID.
+
+## Installer root keys & attestation
+
+No installer root key is bundled — you generate one and inject it. See
+[INSTALLER-KEYS.md](./INSTALLER-KEYS.md) for the full guide; the essentials:
+
+```ts
+import {
+  generateInstallerKeypair,
+  buildKeyAttestation,
+  verifyKeyAttestation,
+  installApp,
+  loadBundledInstallArtifact,
+} from '@railgun-community/ledger-client';
+
+// 1. Generate a root keypair (or run `yarn keygen`).
+const kp = generateInstallerKeypair();
+
+// 2. Install the app, injecting the key. The installer surfaces the root public key at
+//    the "Allow unsafe manager" step so your UI can show the user what to expect on-device.
+const { apduData, elfData } = loadBundledInstallArtifact('flex');
+await installApp(transport, { apduData, elfData, rootPrivateKey: kp.privateKey, scp: true });
+
+// 3. Publish a self-signed attestation so users can verify the key you portray.
+const attestation = buildKeyAttestation({
+  privateKey: kp.privateKey,
+  identity: { name: 'Acme Wallet', url: 'https://acme.example' },
+});
+
+// 4. Anyone can verify it (never throws; returns { ok, reasons }).
+const result = verifyKeyAttestation(attestation); // { ok: true, reasons: [] }
+```

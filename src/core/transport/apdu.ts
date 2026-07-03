@@ -137,6 +137,7 @@ export const RailgunAppINS = {
   GET_VIEWING_KEY: 0x13,
 
   // ─── Ethereum / EIP-7702 — matched to current embedded app demo ──────
+  // EIP-7702 (SIGN_EIP7702_AUTHORIZATION) is UNDER DEVELOPMENT — see CAPABILITY_STATUS.
   /** Get secp256k1 public key. Data: address_index(4B BE). Response: 04 || x(32) || y(32). */
   GET_ETHEREUM_PUBLIC_KEY: 0x07,
   /** Sign EIP-7702 authorization. Data: path + chainId(8B) + contract(20B) + nonce(8B). */
@@ -144,7 +145,7 @@ export const RailgunAppINS = {
   /** Sign Ethereum tx/message hash. Data: path + hash(32B). P1 0x01=display, 0x00=gated. */
   SIGN_ETHEREUM_TX_HASH: 0x09,
 
-  // ─── FROST / MPC ──────────────────────────────────────────────────────
+  // ─── FROST / MPC — UNSUPPORTED on current firmware (see CAPABILITY_STATUS) ──
   INJECT_SECRET: 0x19,
   GET_COMMITMENTS: 0x1a,
   INJECT_COMMITMENTS_1: 0x1b,
@@ -386,6 +387,8 @@ export function parseEthereumSignatureResponse(data: Uint8Array): EthereumSignat
 }
 
 // ─── FROST / MPC command builders ─────────────────────────────────────────────
+// STATUS: UNSUPPORTED. The live RAILGUN BOLOS app does not implement FROST/MPC yet;
+// these builders exist for forward development only. See CAPABILITY_STATUS.
 
 /**
  * Build INJECT_SECRET APDU.
