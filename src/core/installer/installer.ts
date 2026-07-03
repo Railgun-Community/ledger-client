@@ -1,5 +1,8 @@
 /**
- * SCP-based app installer.
+ * SCP-based app installer. EXPERIMENTAL — API may change.
+ *
+ * No root key is bundled: the integrator generates one (`yarn keygen` /
+ * `generateInstallerKeypair`) and injects it via `installApp({ rootPrivateKey })`.
  *
  * Orchestrates the full install flow:
  * 1. Parse APDU script
@@ -34,7 +37,6 @@ import { tryGetTargetIdFromElf } from './elf-parser.js';
 import { primeDevice } from './prime.js';
 import { getDeployedSecretV2, createScpSession } from './scp.js';
 import { ensurePrivateKey32, getPublicKey } from './crypto.js';
-import { getRootKey } from './keys.js';
 
 /**
  * Install an app onto a Ledger device via SCP-wrapped APDU commands.
@@ -122,9 +124,14 @@ export async function installApp(
       message: 'Establishing secure channel…',
     });
 
-    const rootPrivate = config.rootPrivateKey
-      ? ensurePrivateKey32(config.rootPrivateKey)
-      : getRootKey(config.keyEnvironment ?? 'dev');
+    if (config.rootPrivateKey === undefined) {
+      throw new Error(
+        'A root private key is required for SCP installs. Provide config.rootPrivateKey — ' +
+          'no key is bundled with this package. Generate one with `yarn keygen` or ' +
+          'generateInstallerKeypair() and inject it here.',
+      );
+    }
+    const rootPrivate = ensurePrivateKey32(config.rootPrivateKey);
 
     const expectedPublic = getPublicKey(rootPrivate);
     const rootPublicKeyHex = bytesToHex(expectedPublic);

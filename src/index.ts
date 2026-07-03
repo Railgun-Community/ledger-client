@@ -54,7 +54,6 @@ export type {
   InstallResult,
   InstallVerificationData,
   OnProgress,
-  KeyEnvironment,
   ScpChannel,
   ScpSession,
 } from './core/installer/types.js';
@@ -68,7 +67,6 @@ export {
 // ─── SCP Installer ───────────────────────────────────────────────────────────
 export { installApp, verifyInstalledApp } from './core/installer/installer.js';
 export { extractAppName, computeCodeHash, computeAppHash, computeCodeId } from './core/installer/apdu-parser.js';
-export { getRootKey } from './core/installer/keys.js';
 export { tryGetTargetIdFromElf } from './core/installer/elf-parser.js';
 export {
   loadBundledInstallArtifact,
@@ -79,6 +77,34 @@ export type {
   BundledArtifactTarget,
   BundledInstallArtifact,
 } from './core/installer/bundled-artifacts.js';
+
+// ─── Installer key generation + attestation (EXPERIMENTAL) ───────────────────
+// The consuming wallet developer generates and injects their own SCP root key;
+// no key is bundled. `buildKeyAttestation`/`verifyKeyAttestation` produce and
+// check a self-signed proof that the public key the installer portrays is
+// validly theirs. API and attestation format may change.
+export {
+  generateInstallerKeypair,
+  buildKeyAttestation,
+  verifyKeyAttestation,
+  computeInstallerKeyFingerprint,
+  KEY_ATTESTATION_SCHEMA,
+  KEY_ATTESTATION_VERSION,
+  KEY_ATTESTATION_PURPOSE,
+  KEY_ATTESTATION_STATUS,
+} from './core/installer/attestation.js';
+export type {
+  InstallerKeypair,
+  KeyAttestationV1,
+  KeyAttestationArtifact,
+  KeyAttestationIdentity,
+  KeyAttestationInput,
+  KeyAttestationVerifyResult,
+} from './core/installer/attestation.js';
+
+// ─── Capability status (experimental surface map) ────────────────────────────
+export { CAPABILITY_STATUS } from './core/capabilities.js';
+export type { CapabilityStatus } from './core/capabilities.js';
 
 export type {
   MachineState,
@@ -92,6 +118,12 @@ export type {
 export { HWError, HWErrorCode } from './core/errors.js';
 
 // ─── RAILGUN APDU commands ───────────────────────────────────────────────────
+// STATUS: FROST/MPC builders (buildInjectSecret, buildGetCommitments,
+// buildInjectCommitments1/2, buildPartialSign, buildMpcReset,
+// COMMITMENTS_RESPONSE_LENGTH) are UNSUPPORTED — the live RAILGUN app does not
+// implement FROST yet. The EIP-7702 builders (RAILGUN_EIP7702_BIP32_PATH,
+// buildRailgunEip7702Bip32Path, buildSignEip7702Authorization) are UNDER
+// DEVELOPMENT. See CAPABILITY_STATUS.
 export type {
   ApduCommandDef,
   ApduSignDef,
@@ -187,6 +219,8 @@ export type {
 export { createLedgerController } from './sdk/controller/ledger-controller.js';
 
 // ─── SDK engine contracts ──────────────────────────────────────────────────
+// STATUS: the *7702* / RelayAdapt7702 exports below are UNDER DEVELOPMENT
+// (see CAPABILITY_STATUS).
 export type {
   EngineLedgerSignFn,
   EngineLedgerConnector,

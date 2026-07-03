@@ -6,7 +6,7 @@
  * Usage:
  *   npx tsx scripts/install-app.ts --apduFile nanosp/app.apdu --elfFile nanosp/app.elf --scp
  *   npx tsx scripts/install-app.ts --apduFile nanosp/app.apdu --elfFile nanosp/app.elf --scp --rootPrivateKey 0x330e...
- *   npx tsx scripts/install-app.ts --apduFile nanosp/app.apdu --scp --env dev
+ *   npx tsx scripts/install-app.ts --apduFile nanosp/app.apdu --scp --rootKeyFile .certs/installer-root.key
  *   npx tsx scripts/install-app.ts --target flex --scp
  *   npx tsx scripts/install-app.ts --target nanosp --scp
  *
@@ -48,11 +48,21 @@ async function main(): Promise<void> {
   const apduData = fs.readFileSync(resolved.apduFile, 'utf8');
   const elfData = resolved.elfFile ? new Uint8Array(fs.readFileSync(resolved.elfFile)) : undefined;
 
-  // Resolve root key
+  // Resolve root key: --rootPrivateKey (hex) or --rootKeyFile (path to hex).
+  // No key is bundled — the integrator generates one with `yarn keygen`.
+  const rootKeyHex =
+    args.rootPrivateKey ??
+    (args.rootKeyFile !== undefined ? fs.readFileSync(args.rootKeyFile, 'utf8').trim() : undefined);
   let rootPrivateKey: Uint8Array | undefined;
-  if (args.rootPrivateKey) {
+  if (rootKeyHex !== undefined && rootKeyHex.length > 0) {
     const { ensurePrivateKey32 } = await import('../src/core/installer/crypto.js');
-    rootPrivateKey = ensurePrivateKey32(args.rootPrivateKey);
+    rootPrivateKey = ensurePrivateKey32(rootKeyHex);
+  }
+  if (args.scp && rootPrivateKey === undefined) {
+    throw new Error(
+      'SCP installs require a root private key. Pass --rootKeyFile <path> or --rootPrivateKey <hex> ' +
+        '(generate one with `yarn keygen`). No key is bundled.',
+    );
   }
 
   // Connect transport
@@ -65,7 +75,6 @@ async function main(): Promise<void> {
 
   try {
     const { installApp } = await import('../src/core/installer/installer.js');
-    const { KeyEnvironment } = await import('../src/core/installer/types.js');
 
     const result = await installApp(
       transport,
@@ -73,7 +82,6 @@ async function main(): Promise<void> {
         apduData,
         elfData,
         rootPrivateKey,
-        keyEnvironment: (args.env as 'prod' | 'dev') ?? 'dev',
         scp: args.scp,
         targetId: args.targetId,
         retryCount: args.retryCount,
@@ -118,7 +126,7 @@ interface CliArgs {
   apduFile?: string;
   elfFile?: string;
   rootPrivateKey?: string;
-  env?: string;
+  rootKeyFile?: string;
   scp: boolean;
   targetId?: number;
   retryCount: number;
@@ -158,8 +166,8 @@ function parseArgs(argv: string[]): CliArgs {
         result.rootPrivateKey = next;
         i++;
         break;
-      case '--env':
-        result.env = next;
+      case '--rootKeyFile':
+        result.rootKeyFile = next;
         i++;
         break;
       case '--scp':
@@ -207,8 +215,8 @@ Options:
   --apduFile <path>       Path to .apdu file (required)
   --elfFile <path>        Path to .elf file (extracts targetId)
   --scp                   Enable SCP wrapping (required for real installs)
-  --rootPrivateKey <hex>  Root private key (32 bytes, hex)
-  --env <prod|dev>        Key environment (default: dev)
+  --rootPrivateKey <hex>  Root private key (32 bytes, hex) — prefer --rootKeyFile
+  --rootKeyFile <path>    File containing the root private key hex (from yarn keygen)
   --targetId <hex|int>    Target device ID (default: 0x33100004)
   --retryCount <n>        APDU retries for transient errors (default: 30)
   --retryDelayMs <ms>     Delay between retries (default: 300)
@@ -219,6 +227,6 @@ Examples:
   yarn install:app:nanosp
   yarn install:app -- --target flex --scp
   npx tsx scripts/install-app.ts --apduFile apps/nanosp/app.apdu --elfFile apps/nanosp/app.elf --scp
-  npx tsx scripts/install-app.ts --apduFile apps/nanosp/app.apdu --scp --env prod
+  npx tsx scripts/install-app.ts --apduFile apps/nanosp/app.apdu --scp --rootKeyFile .certs/installer-root.key
   `.trim());
 }
