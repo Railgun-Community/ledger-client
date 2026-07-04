@@ -24,6 +24,7 @@ import {
 } from '../../core/signers/eth-signer.js';
 import { RailgunSigner } from '../../core/signers/railgun-signer.js';
 import type { EthereumSignatureParts } from '../../core/transport/apdu.js';
+import { classifyDeviceError } from '../../core/transport/status-words.js';
 import type {
   RailgunEthereumPreloadRequest,
   RailgunEthereumSignerSession,
@@ -354,33 +355,17 @@ export function createLedgerController(
   }
 
   function normalizeAppOpenError(error: unknown, appName: string): HWError {
-    const message = error instanceof Error ? error.message : `Failed to open app "${appName}".`;
-    const lowered = message.toLowerCase();
     if (error instanceof HWError && error.code === HWErrorCode.APP_NOT_INSTALLED) {
       return error;
     }
-    if (
-      lowered.includes('rejected')
-      || lowered.includes('denied')
-      || lowered.includes('cancelled')
-      || lowered.includes('canceled')
-    ) {
-      return new HWError(HWErrorCode.SIGN_REJECTED_DEVICE, message, error);
-    }
-    if (lowered.includes('timeout')) {
-      return new HWError(HWErrorCode.TRANSPORT_TIMEOUT, message, error);
-    }
-    if (
-      lowered.includes('disconnect')
-      || lowered.includes('disconnected')
-      || lowered.includes('connection lost')
-      || lowered.includes('closed')
-    ) {
-      return new HWError(HWErrorCode.TRANSPORT_DISCONNECTED, message, error);
+    const classified = classifyDeviceError(error);
+    if (classified !== null) {
+      return classified;
     }
     if (error instanceof HWError) {
       return error;
     }
+    const message = error instanceof Error ? error.message : `Failed to open app "${appName}".`;
     return new HWError(HWErrorCode.APP_OPEN_FAILED, message, error);
   }
 
@@ -431,28 +416,11 @@ export function createLedgerController(
     if (error instanceof HWError) {
       return error;
     }
-
+    const classified = classifyDeviceError(error);
+    if (classified !== null) {
+      return classified;
+    }
     const message = error instanceof Error ? error.message : fallbackMessage;
-    const lowered = message.toLowerCase();
-    if (
-      lowered.includes('rejected')
-      || lowered.includes('denied')
-      || lowered.includes('cancelled')
-      || lowered.includes('canceled')
-    ) {
-      return new HWError(HWErrorCode.SIGN_REJECTED_DEVICE, message, error);
-    }
-    if (lowered.includes('timeout')) {
-      return new HWError(HWErrorCode.TRANSPORT_TIMEOUT, message, error);
-    }
-    if (
-      lowered.includes('disconnect')
-      || lowered.includes('disconnected')
-      || lowered.includes('connection lost')
-      || lowered.includes('closed')
-    ) {
-      return new HWError(HWErrorCode.TRANSPORT_DISCONNECTED, message, error);
-    }
     return new HWError(HWErrorCode.APDU_STATUS_ERROR, message, error);
   }
 
