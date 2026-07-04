@@ -28,7 +28,7 @@ project is pre-1.0 and experimental; expect breaking changes on minor versions.
 - `scripts/install-app.ts --rootKeyFile <path>` to inject a key from a file.
 - `CAPABILITY_STATUS` — a machine-readable status map (installer + key attestation
   `experimental`; FROST `unsupported`; EIP-7702 `under-development`).
-- `docs/INSTALLER-KEYS.md` — full guide to the installer-key generation, injection,
+- `docs/api/installer-keys.md` — full guide to the installer-key generation, injection,
   custody, and attestation flow.
 
 ### Changed

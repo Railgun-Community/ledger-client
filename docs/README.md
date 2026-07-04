@@ -1,24 +1,27 @@
-# @railgun-community/ledger-client SDK Docs
+# @railgun-community/ledger-client — documentation
 
-This directory documents the browser-wallet SDK surface built on top of the core Ledger support in this repository.
+The framework-agnostic core for driving a Ledger as a RAILGUN hardware wallet. React
+bindings (`LedgerProvider`, hooks, `LedgerModalHost`) ship separately in
+[`@railgun-community/ledger-client-react`](https://github.com/Railgun-Community/ledger-client-react),
+which consumes this core.
 
-## Documents
+## Start here
 
-- [sdk-overview.md](./sdk-overview.md)
-  - module structure and responsibilities
-- [sdk-controller.md](./sdk-controller.md)
-  - headless controller API and lifecycle rules
-- [sdk-engine.md](./sdk-engine.md)
-  - engine adapter contract and multi-sig batch approval semantics
-- [sdk-examples.md](./sdk-examples.md)
-  - practical usage examples for wallet developers
-- [INSTALLER-KEYS.md](./INSTALLER-KEYS.md)
-  - installer root-key generation, injection, and the key-attestation flow (experimental)
+- [getting-started.md](./getting-started.md) — install → connect → readiness → first signature
+- [architecture.md](./architecture.md) — layers, invariants, and status/limitations
+- [examples.md](./examples.md) — runnable snippets (controller, engine, signers, installer)
+- [troubleshooting.md](./troubleshooting.md) — error codes, status words, WebHID setup
 
-## SDK surface
+## API reference
 
-- headless `LedgerController`
-- engine adapters for session-based and legacy batch approval flows
+- [api/controller.md](./api/controller.md) — headless `LedgerController` (recommended entry point)
+- [api/engine.md](./api/engine.md) — RAILGUN engine connector adapters
+- [api/signers.md](./api/signers.md) — `RailgunSigner`, `EthSigner`
+- [api/transport.md](./api/transport.md) — `HWTransport`, WebHID / Node HID / mock
+- [api/installer-keys.md](./api/installer-keys.md) — SCP app installer + key generation & attestation
 
-React `LedgerProvider`, hooks, and `LedgerModalHost` ship in the separate
-[`@railgun-community/ledger-client-react`](https://github.com/Railgun-Community/ledger-client-react) package.
+## Status
+
+Experimental / pre-1.0. FROST/MPC is unsupported; EIP-7702 is under development (see
+`CAPABILITY_STATUS`). No installer root key is bundled — see
+[api/installer-keys.md](./api/installer-keys.md).
