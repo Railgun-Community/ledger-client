@@ -39,7 +39,6 @@
     "install:app:nanosp": "tsx scripts/install-app.ts --target nanosp --scp"
   },
   "devDependencies": {
-    "@ledgerhq/hw-app-btc": "^10.4.0",
     "@ledgerhq/hw-app-eth": "^6.41.0",
     "@ledgerhq/hw-transport": "^6.31.0",
     "@ledgerhq/hw-transport-node-hid": "^6.32.1",

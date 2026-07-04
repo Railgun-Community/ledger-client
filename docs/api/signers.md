@@ -82,7 +82,7 @@ prove EOA ownership for the shield flow.
 
 ## App requirements
 
-`RAILGUN_APP`, `ETH_APP` (and an internal `BTC_APP`) are exported `AppRequirement`s (name +
+`RAILGUN_APP` and `ETH_APP` are exported `AppRequirement`s (name +
 `minVersion` + `cla`) used by the device manager and controller to validate/open the right
 app. Pass them to `createLedgerController({ requiredApps: [...] })`.
 

@@ -80,7 +80,7 @@ export class NodeHIDTransport implements HWTransport {
     try {
       // Build raw APDU: [CLA, INS, P1, P2, Lc, ...data]
       // Use exchange() directly to avoid the SDK's send() which adds
-      // status word filtering that breaks multi-round protocols (e.g. BTC new app).
+      // status word filtering that breaks multi-round APDU protocols.
       const data = command.data !== undefined && command.data.length > 0
         ? command.data
         : new Uint8Array(0);
@@ -144,7 +144,7 @@ export class NodeHIDTransport implements HWTransport {
   }
 
   /**
-   * Expose the raw Ledger SDK transport for direct use by hw-app-eth / hw-app-btc.
+   * Expose the raw Ledger SDK transport for direct use by hw-app-eth.
    * This is needed because those SDK apps expect a native Transport instance,
    * not our HWTransport wrapper.
    */

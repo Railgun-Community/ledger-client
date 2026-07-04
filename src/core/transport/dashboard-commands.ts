@@ -6,7 +6,7 @@
  * when the dashboard is active.
  *
  * Reference: Ledger BOLOS documentation + reverse-engineered from
- * @ledgerhq/hw-app-btc and ledger-live source.
+ * the Ledger SDK and ledger-live source.
  */
 
 import type { ApduCommand } from './types.js';
