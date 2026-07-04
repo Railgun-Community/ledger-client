@@ -417,15 +417,11 @@ export function createLedgerController(
   }
 
   function beginEthSigning(): void {
-    state = 'eth_confirming';
-    context = { ...context, lastSafeState: 'signer_idle' };
-    emit();
+    send({ type: 'ETH_SIGN_REQUEST' });
   }
 
   function completeEthSigning(): void {
-    state = 'eth_complete';
-    context = { ...context, lastSafeState: 'signer_idle' };
-    emit();
+    send({ type: 'ETH_SIGN_COMPLETE' });
     settleAutoState();
   }
 

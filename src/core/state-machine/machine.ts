@@ -427,6 +427,12 @@ function handleSignerIdle(
       },
     };
   }
+  if (event.type === 'ETH_SIGN_REQUEST') {
+    return {
+      state: 'eth_confirming',
+      context: { ...ctx, lastSafeState: 'signer_idle' },
+    };
+  }
   if (event.type === 'SWITCH_MODE') {
     if (event.mode === 'installer') {
       return {
@@ -618,7 +624,7 @@ function handleEthConfirming(
   ctx: MachineContext,
   event: MachineEvent,
 ): TransitionResult {
-  if (event.type === 'SIGN_COMPLETE') {
+  if (event.type === 'SIGN_COMPLETE' || event.type === 'ETH_SIGN_COMPLETE') {
     return { state: 'eth_complete', context: ctx };
   }
   if (event.type === 'DEVICE_REJECTED') {

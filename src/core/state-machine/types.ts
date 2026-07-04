@@ -84,6 +84,8 @@ export type MachineEvent =
   // Engine-initiated
   | { type: 'SIGN_REQUEST'; hash: bigint; publicInputs?: PublicInputsRailgun }
   | { type: 'BATCH_SIGN_REQUEST'; requests: readonly RequestApprovalOptions[] }
+  | { type: 'ETH_SIGN_REQUEST' }
+  | { type: 'ETH_SIGN_COMPLETE' }
   // Transport/device-initiated
   | { type: 'TRANSPORT_CONNECTED' }
   | { type: 'TRANSPORT_DISCONNECTED' }
