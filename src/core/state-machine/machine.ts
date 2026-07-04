@@ -245,8 +245,18 @@ export function transition(
       return { state, context: ctx };
 
     default:
-      return { state, context: ctx };
+      return assertExhaustive(state, ctx);
   }
+}
+
+/**
+ * Compile-time exhaustiveness guard: every non-terminal `MachineState` must have
+ * an explicit handler in the switch above. If a new state is added without one,
+ * `state` is no longer `never` here and this fails to type-check. At runtime an
+ * unexpected state is returned unchanged (no behavior change from before).
+ */
+function assertExhaustive(state: never, ctx: MachineContext): TransitionResult {
+  return { state, context: ctx };
 }
 
 // ─── State handlers ─────────────────────────────────────────────────────────
