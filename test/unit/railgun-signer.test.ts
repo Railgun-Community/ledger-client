@@ -54,9 +54,9 @@ function writeBigint32BE(buf: Uint8Array, offset: number, value: bigint) {
   }
 }
 
-// Small values that pass BabyJubjub field/subgroup validation
-const SMALL_R8X = 42n;
-const SMALL_R8Y = 99n;
+// On-curve R8 = (0, 1) + small in-subgroup S — passes signature validation.
+const SMALL_R8X = 0n;
+const SMALL_R8Y = 1n;
 const SMALL_S = 7n;
 const VALID_SPENDING_PUBLIC_KEY = {
   x: 15684838006997671713939066069845237677934334329285343229142447933587909549584n,
@@ -267,7 +267,10 @@ describe('RailgunSigner', () => {
       signer = new RailgunSigner({ transport, account: 7 });
       transport.enqueueResponse(ethereumSignatureResponse(0));
 
-      const signature = await signer.signEthereumTxHash(new Uint8Array(32).fill(0xab), { display: false });
+      const signature = await signer.signEthereumTxHash(
+        new Uint8Array(32).fill(0xab),
+        { display: false, allowBlind: true },
+      );
 
       expect(signature.yParity).toBe(0);
       const cmd = transport.sentCommands[0];
@@ -276,6 +279,14 @@ describe('RailgunSigner', () => {
       expect(Buffer.from(cmd?.data?.slice(0, 12) ?? new Uint8Array()).toString('hex')).toBe(
         '000000070000000000000000',
       );
+    });
+
+    it('rejects blind signing without an explicit allowBlind opt-in', async () => {
+      signer = new RailgunSigner({ transport, account: 7 });
+      await expect(
+        signer.signEthereumTxHash(new Uint8Array(32).fill(0xab), { display: false }),
+      ).rejects.toMatchObject({ code: 'SIGN_BLIND_NOT_ALLOWED' });
+      expect(transport.sentCommands).toHaveLength(0);
     });
 
     it('rejects embedded Ethereum signing when the profile does not advertise support', async () => {

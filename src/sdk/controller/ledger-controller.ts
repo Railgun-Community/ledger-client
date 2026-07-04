@@ -1095,10 +1095,11 @@ export function createLedgerController(
       emit();
 
       const result = await installApp(transport, config, onProgress);
-      if (!result.success) {
+      if (!result.success || result.completedCommands !== result.totalCommands) {
         throw new HWError(
           HWErrorCode.APP_OPEN_FAILED,
-          result.error ?? 'App installation failed.',
+          result.error ??
+            `App installation incomplete: ${String(result.completedCommands)}/${String(result.totalCommands)} commands succeeded.`,
         );
       }
       emit();

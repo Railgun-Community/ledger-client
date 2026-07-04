@@ -17,6 +17,13 @@ export const BABYJUBJUB_ORDER =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
 /**
+ * Upper bound on public-input array lengths. Far above any real RAILGUN circuit
+ * (whose input/output counts are low double digits); exists only to bound the
+ * pre-sign Poseidon work against a maliciously oversized array (DoS).
+ */
+export const MAX_PUBLIC_INPUT_ELEMENTS = 256;
+
+/**
  * Validate that a bigint is within the BabyJubjub scalar field [0, q).
  */
 export function isInField(value: bigint): boolean {
@@ -72,6 +79,12 @@ export function validatePublicInputs(inputs: unknown): asserts inputs is PublicI
       'nullifiers must be a non-empty array',
     );
   }
+  if (obj['nullifiers'].length > MAX_PUBLIC_INPUT_ELEMENTS) {
+    throw new HWError(
+      HWErrorCode.VALIDATION_PUBLIC_INPUTS,
+      `nullifiers exceeds maximum length ${String(MAX_PUBLIC_INPUT_ELEMENTS)}`,
+    );
+  }
   for (const n of obj['nullifiers'] as unknown[]) {
     if (typeof n !== 'bigint') {
       throw new HWError(
@@ -92,6 +105,12 @@ export function validatePublicInputs(inputs: unknown): asserts inputs is PublicI
     throw new HWError(
       HWErrorCode.VALIDATION_PUBLIC_INPUTS,
       'commitmentsOut must be a non-empty array',
+    );
+  }
+  if (obj['commitmentsOut'].length > MAX_PUBLIC_INPUT_ELEMENTS) {
+    throw new HWError(
+      HWErrorCode.VALIDATION_PUBLIC_INPUTS,
+      `commitmentsOut exceeds maximum length ${String(MAX_PUBLIC_INPUT_ELEMENTS)}`,
     );
   }
   for (const c of obj['commitmentsOut'] as unknown[]) {

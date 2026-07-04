@@ -379,10 +379,19 @@ export function parseEthereumSignatureResponse(data: Uint8Array): EthereumSignat
   const toHex = (bytes: Uint8Array): string => Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
+  const rHex = toHex(data.slice(1, 33));
+  const sHex = toHex(data.slice(33, 65));
+  // secp256k1 curve order; r and s must be in [1, n).
+  const order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+  const r = BigInt(`0x${rHex}`);
+  const s = BigInt(`0x${sHex}`);
+  if (r <= 0n || r >= order || s <= 0n || s >= order) {
+    throw new Error('Ethereum signature r/s out of range [1, secp256k1 order)');
+  }
   return {
     yParity,
-    r: `0x${toHex(data.slice(1, 33))}`,
-    s: `0x${toHex(data.slice(33, 65))}`,
+    r: `0x${rHex}`,
+    s: `0x${sHex}`,
   };
 }
 

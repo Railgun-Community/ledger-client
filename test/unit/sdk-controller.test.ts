@@ -146,7 +146,7 @@ describe('createLedgerController', () => {
     const controller = createController();
     enqueueReadyResponses();
     transport.enqueueResponse(successResponse(buildAppVersionResponse('RAILGUN', '0.1.0')));
-    transport.enqueueResponse(successResponse(buildSignResponse(42n, 99n, 7n)));
+    transport.enqueueResponse(successResponse(buildSignResponse(0n, 1n, 7n)));
 
     const signPromise = controller.sign(12345n);
     await waitForState(() => controller.getSnapshot().machineState, 'reviewing');
@@ -166,8 +166,8 @@ describe('createLedgerController', () => {
 
     const signature = await signPromise;
 
-    expect(signature.R8[0]).toBe(42n);
-    expect(signature.R8[1]).toBe(99n);
+    expect(signature.R8[0]).toBe(0n);
+    expect(signature.R8[1]).toBe(1n);
     expect(signature.S).toBe(7n);
     expect(controller.getSnapshot().machineState).toBe('signer_idle');
   });

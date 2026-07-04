@@ -127,6 +127,12 @@ export type EthereumTxHashSignOptions = {
   readonly display?: boolean;
   readonly path?: readonly number[];
   readonly session?: RailgunEthereumSignerSession;
+  /**
+   * Explicit opt-in required to blind-sign (display: false). Without it, a
+   * display:false request is rejected — the device would otherwise sign a
+   * 32-byte digest with no on-screen context. Prefer clear signing.
+   */
+  readonly allowBlind?: boolean;
 };
 
 /**
@@ -296,6 +302,12 @@ export class RailgunSigner {
     options: EthereumTxHashSignOptions = {},
   ): Promise<EthereumSignatureParts> {
     const display = options.display ?? true;
+    if (!display && options.allowBlind !== true) {
+      throw new HWError(
+        HWErrorCode.SIGN_BLIND_NOT_ALLOWED,
+        'Blind Ethereum signing (display: false) requires an explicit allowBlind: true opt-in. Prefer clear signing (display: true).',
+      );
+    }
     this.requireCapability(
       (capabilities) => capabilities.ethereumTxHash,
       'RAILGUN app does not advertise Ethereum tx-hash signing support.',

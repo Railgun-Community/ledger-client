@@ -349,11 +349,8 @@ describe('crypto utilities', () => {
       expect(key[0]).toBe(0x01);
     });
 
-    it('should pad short hex', () => {
-      const key = ensurePrivateKey32('01');
-      expect(key.length).toBe(32);
-      expect(key[31]).toBe(0x01);
-      expect(key[0]).toBe(0x00);
+    it('should reject short hex (no silent zero-padding)', () => {
+      expect(() => ensurePrivateKey32('01')).toThrow('32 bytes');
     });
 
     it('should accept Uint8Array', () => {

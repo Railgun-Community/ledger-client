@@ -45,12 +45,9 @@ function appAndVersionResponse(name: string, version: string) {
 function validSignResponse() {
   const data = new Uint8Array(97);
   data[0] = 0x00; // prefix byte
-  // R8.x = 42 (small, valid)
-  data[32] = 42;
-  // R8.y = 99 (small, valid)
-  data[64] = 99;
-  // S = 7 (small, valid)
-  data[96] = 7;
+  // R8 = (0, 1) — on the BabyJubjub curve; S = 7 (in-subgroup).
+  data[64] = 1; // R8.y = 1 (big-endian LSB); R8.x stays 0
+  data[96] = 7; // S = 7
   return successResponse(data);
 }
 
@@ -99,8 +96,8 @@ describe('createLedgerConnector', () => {
       transport.enqueueResponse(validSignResponse());
 
       const sig = await connector.sign(12345n);
-      expect(sig.R8[0]).toBe(42n);
-      expect(sig.R8[1]).toBe(99n);
+      expect(sig.R8[0]).toBe(0n);
+      expect(sig.R8[1]).toBe(1n);
       expect(sig.S).toBe(7n);
 
       // Two commands: GET_APP_AND_VERSION + SIGN_HASH

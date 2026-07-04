@@ -11,8 +11,9 @@ import {
 import type { Signature } from '../../src/core/connector/types.js';
 import { HWError } from '../../src/core/errors.js';
 
+// (0, 1) is the twisted-Edwards neutral point — verifiably on the BabyJubjub curve.
 const VALID_SIG: Signature = {
-  R8: [100n, 200n],
+  R8: [0n, 1n],
   S: 42n,
 };
 
@@ -21,17 +22,23 @@ describe('validateSignature', () => {
     expect(() => validateSignature(VALID_SIG)).not.toThrow();
   });
 
-  it('accepts zero values', () => {
-    expect(() => validateSignature({ R8: [0n, 0n], S: 0n })).not.toThrow();
+  it('rejects the off-curve zero point (0,0)', () => {
+    expect(() => validateSignature({ R8: [0n, 0n], S: 0n })).toThrow(HWError);
   });
 
-  it('accepts max valid values (just under bounds)', () => {
+  it('accepts an on-curve point with max S ((0, p-1) is on-curve)', () => {
     expect(() =>
       validateSignature({
-        R8: [BABYJUBJUB_FIELD_PRIME - 1n, BABYJUBJUB_FIELD_PRIME - 1n],
+        R8: [0n, BABYJUBJUB_FIELD_PRIME - 1n],
         S: BABYJUBJUB_SUBGROUP_ORDER - 1n,
       }),
     ).not.toThrow();
+  });
+
+  it('rejects an off-curve point with in-field coordinates', () => {
+    expect(() =>
+      validateSignature({ R8: [100n, 200n], S: 42n }),
+    ).toThrow(HWError);
   });
 
   it('rejects R8.x at field prime', () => {

@@ -245,11 +245,20 @@ export async function installApp(
       }
     }
 
-    // Check status
+    // Check status. A non-9000 inner status word means the device rejected this
+    // command — fail the install rather than silently skipping it, so a partial
+    // install can never be reported as success.
     const swHex = bytesToHex(result.subarray(result.length - 2));
-    if (swHex === '9000') {
-      completedCommands++;
+    if (swHex !== '9000') {
+      const hint = STATUS_HINTS[swHex] ?? 'Device rejected the install command.';
+      return {
+        success: false,
+        totalCommands,
+        completedCommands,
+        error: `APDU line ${String(lineNumber)}: status 0x${swHex}. ${hint}`,
+      };
     }
+    completedCommands++;
 
     onProgress?.({
       phase: 'installing',

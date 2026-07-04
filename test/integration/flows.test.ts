@@ -49,7 +49,7 @@ function appAndVersionResponse(name: string, version: string) {
   return successResponse(data);
 }
 
-function validSignResponse(r8x = 42n, r8y = 99n, s = 7n) {
+function validSignResponse(r8x = 0n, r8y = 1n, s = 7n) {
   const data = new Uint8Array(97);
   data[0] = 0x00; // prefix byte
   writeBE(data, 1, r8x);
@@ -276,8 +276,8 @@ describe('RailgunSigner integration with MockTransport', () => {
     expect(pk.y).toBe(200n);
 
     const sig = await signer.sign(12345n);
-    expect(sig.R8[0]).toBe(42n);
-    expect(sig.R8[1]).toBe(99n);
+    expect(sig.R8[0]).toBe(0n);
+    expect(sig.R8[1]).toBe(1n);
     expect(sig.S).toBe(7n);
 
     expect(transport.sentCommands).toHaveLength(2);
@@ -317,7 +317,7 @@ describe('LedgerConnector integration with MockTransport', () => {
     transport.enqueueResponse(validSignResponse());
 
     const sig = await connector.sign(12345n);
-    expect(sig.R8[0]).toBe(42n);
+    expect(sig.R8[0]).toBe(0n);
     expect(sig.S).toBe(7n);
   });
 

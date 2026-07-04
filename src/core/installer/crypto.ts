@@ -117,11 +117,11 @@ export function ensurePrivateKey32(hexOrBytes: string | Uint8Array): Uint8Array 
   if (!/^[0-9a-fA-F]+$/.test(normalized) || normalized.length === 0) {
     throw new Error('Invalid root private key hex');
   }
-  const padded = normalized.length < 64 ? normalized.padStart(64, '0') : normalized;
-  if (padded.length !== 64) {
-    throw new Error('Root private key must be 32 bytes (64 hex chars)');
+  // Require exactly 32 bytes — never silently zero-pad a short (low-entropy) key.
+  if (normalized.length !== 64) {
+    throw new Error('Root private key must be exactly 32 bytes (64 hex chars)');
   }
-  return hexToBytes(padded);
+  return hexToBytes(normalized);
 }
 
 /**
