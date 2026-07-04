@@ -87,7 +87,7 @@ export type MachineEvent =
   | { type: 'ETH_SIGN_REQUEST' }
   | { type: 'ETH_SIGN_COMPLETE' }
   | { type: 'APP_MISSING' }
-  | { type: 'APP_OUTDATED' }
+  | { type: 'APP_OUTDATED'; appInfo?: ActiveAppInfo }
   | { type: 'APP_OPEN_FAILED' }
   | { type: 'OPEN_APP_REQUEST' }
   | { type: 'APP_CLOSED' }

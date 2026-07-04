@@ -487,9 +487,7 @@ export function createLedgerController(
     const currentApp = await getActiveApp(transport);
     if (currentApp !== null && currentApp.name === requirement.name) {
       if (!isVersionSatisfied(currentApp.version, requirement.minVersion)) {
-        state = 'app_outdated';
-        context = { ...context, activeApp: currentApp };
-        emit();
+        send({ type: 'APP_OUTDATED', appInfo: currentApp });
         throw new HWError(
           HWErrorCode.APP_VERSION_MISMATCH,
           `App version ${currentApp.version} < required ${requirement.minVersion}`,
@@ -497,13 +495,7 @@ export function createLedgerController(
       }
 
       connector = null;
-      state = 'signer_idle';
-      context = {
-        ...context,
-        activeApp: currentApp,
-        lastSafeState: 'signer_idle',
-      };
-      emit();
+      send({ type: 'APP_OPENED', appInfo: currentApp });
       return;
     }
 
@@ -511,15 +503,12 @@ export function createLedgerController(
 
     if (currentApp !== null) {
       await deviceCloseApp(transport);
-      context = { ...context, activeApp: null };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
     }
 
     const deviceInfo: DeviceInfo = await getDeviceInfo(transport);
     context = { ...context, deviceInfo };
-    state = 'opening_app';
-    emit();
+    send({ type: 'OPEN_APP_REQUEST' });
 
     try {
       await deviceOpenApp(transport, requirement.name);
@@ -530,22 +519,14 @@ export function createLedgerController(
     const readyApp = await readVerifiedActiveApp(requirement.name);
 
     if (!isVersionSatisfied(readyApp.version, requirement.minVersion)) {
-      state = 'app_outdated';
-      context = { ...context, activeApp: readyApp };
-      emit();
+      send({ type: 'APP_OUTDATED', appInfo: readyApp });
       throw new HWError(
         HWErrorCode.APP_VERSION_MISMATCH,
         `App version ${readyApp.version} < required ${requirement.minVersion}`,
       );
     }
 
-    state = 'signer_idle';
-    context = {
-      ...context,
-      activeApp: readyApp,
-      lastSafeState: 'signer_idle',
-    };
-    emit();
+    send({ type: 'APP_OPENED', appInfo: readyApp });
   }
 
   async function connectTransport(transportType: TransportType): Promise<void> {
@@ -607,34 +588,24 @@ export function createLedgerController(
     const currentApp = await getActiveApp(transport);
 
     if (currentApp !== null && currentApp.name === requirement.name) {
-      // Fast path: the required app is already open.
-      // GET_VERSION (dashboard command) would fail here, so skip it.
-      // Advance state past querying_device manually.
-      state = 'device_ready';
-
+      // Fast path: the required app is already open. GET_VERSION (dashboard
+      // command) would fail here, so skip straight to the app-open outcome.
       if (!isVersionSatisfied(currentApp.version, requirement.minVersion)) {
-        state = 'app_outdated';
-        context = { ...context, activeApp: currentApp };
-        emit();
+        send({ type: 'APP_OUTDATED', appInfo: currentApp });
         throw new HWError(
           HWErrorCode.APP_VERSION_MISMATCH,
           `App version ${currentApp.version} < required ${requirement.minVersion}`,
         );
       }
 
-      send({ type: 'APP_OPENED', appInfo: currentApp });
-      state = 'signer_idle';
-      context = { ...context, activeApp: currentApp, lastSafeState: 'signer_idle' };
       buildConnector(requirement);
-      emit();
+      send({ type: 'APP_OPENED', appInfo: currentApp });
       return;
     }
 
     if (currentApp !== null) {
       await deviceCloseApp(transport);
-      context = { ...context, activeApp: null };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
     }
 
     // Step 2: Dashboard is active — safe to query device firmware info.
@@ -644,8 +615,7 @@ export function createLedgerController(
     // Step 3: Try to open the required app directly.
     // BOLOS returns 0x6807 (APP_NOT_FOUND) if the app is not installed,
     // which device-manager maps to HWErrorCode.APP_NOT_INSTALLED.
-    state = 'opening_app';
-    emit();
+    send({ type: 'OPEN_APP_REQUEST' });
 
     try {
       await deviceOpenApp(transport, requirement.name);
@@ -657,24 +627,15 @@ export function createLedgerController(
     const readyApp = await readVerifiedActiveApp(requirement.name);
 
     if (!isVersionSatisfied(readyApp.version, requirement.minVersion)) {
-      state = 'app_outdated';
-      context = { ...context, activeApp: readyApp };
-      emit();
+      send({ type: 'APP_OUTDATED', appInfo: readyApp });
       throw new HWError(
         HWErrorCode.APP_VERSION_MISMATCH,
         `App version ${readyApp.version} < required ${requirement.minVersion}`,
       );
     }
 
-    send({ type: 'APP_OPENED', appInfo: readyApp });
-    state = 'signer_idle';
-    context = {
-      ...context,
-      activeApp: readyApp,
-      lastSafeState: 'signer_idle',
-    };
     buildConnector(requirement);
-    emit();
+    send({ type: 'APP_OPENED', appInfo: readyApp });
   }
 
   function mapReadiness(currentState: MachineState): LedgerControllerReadiness {

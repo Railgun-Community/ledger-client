@@ -119,7 +119,14 @@ export function transition(
     return { state: 'app_missing', context: ctx };
   }
   if (event.type === 'APP_OUTDATED') {
-    return { state: 'app_outdated', context: { ...ctx, lastSafeState: 'device_ready' } };
+    return {
+      state: 'app_outdated',
+      context: {
+        ...ctx,
+        ...(event.appInfo !== undefined ? { activeApp: event.appInfo } : {}),
+        lastSafeState: 'device_ready',
+      },
+    };
   }
 
   // DISPOSE from any non-terminal state → terminal.
@@ -311,6 +318,18 @@ function handleQueryingDevice(
       context: { ...ctx, deviceInfo: event.info },
     };
   }
+  if (event.type === 'APP_OPENED') {
+    return {
+      state: 'signer_idle',
+      context: { ...ctx, activeApp: event.appInfo, lastSafeState: 'signer_idle' },
+    };
+  }
+  if (event.type === 'APP_CLOSED') {
+    return { state: 'device_ready', context: { ...ctx, activeApp: null } };
+  }
+  if (event.type === 'OPEN_APP_REQUEST') {
+    return { state: 'opening_app', context: ctx };
+  }
   return { state: 'querying_device', context: ctx };
 }
 
@@ -324,6 +343,18 @@ function handleDeviceReady(
       state: 'app_check',
       context: { ...ctx, installedApps: event.apps },
     };
+  }
+  if (event.type === 'APP_OPENED') {
+    return {
+      state: 'signer_idle',
+      context: { ...ctx, activeApp: event.appInfo, lastSafeState: 'signer_idle' },
+    };
+  }
+  if (event.type === 'OPEN_APP_REQUEST') {
+    return { state: 'opening_app', context: ctx };
+  }
+  if (event.type === 'APP_CLOSED') {
+    return { state: 'device_ready', context: { ...ctx, activeApp: null } };
   }
   if (event.type === 'SWITCH_MODE') {
     if (event.mode === 'installer') {
@@ -457,6 +488,12 @@ function handleSignerIdle(
       state: 'eth_confirming',
       context: { ...ctx, lastSafeState: 'signer_idle' },
     };
+  }
+  if (event.type === 'OPEN_APP_REQUEST') {
+    return { state: 'opening_app', context: ctx };
+  }
+  if (event.type === 'APP_CLOSED') {
+    return { state: 'device_ready', context: { ...ctx, activeApp: null } };
   }
   if (event.type === 'SWITCH_MODE') {
     if (event.mode === 'installer') {
