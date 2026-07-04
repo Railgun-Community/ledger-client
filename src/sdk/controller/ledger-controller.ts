@@ -394,7 +394,7 @@ export function createLedgerController(
       throw error;
     }
     if (error.code === HWErrorCode.APP_NOT_INSTALLED) {
-      send({ type: 'APP_MISSING' });
+      send({ type: 'APP_MISSING', error });
       throw error;
     }
     if (error.code === HWErrorCode.TRANSPORT_TIMEOUT) {
@@ -976,10 +976,8 @@ export function createLedgerController(
         disconnectError = error;
       } finally {
         invalidateSessions();
-        context = createInitialContext(context.mode);
-        state = 'disconnected';
+        send({ type: 'DISCONNECT' });
         lastError = null;
-        emit();
         options.onDisconnect?.();
       }
       if (disconnectError !== undefined) {
@@ -1009,8 +1007,7 @@ export function createLedgerController(
         minVersion: '0.0.0',
         cla: 0,
       };
-      state = 'opening_app';
-      emit();
+      send({ type: 'OPEN_APP_REQUEST' });
       try {
         await deviceOpenApp(transport, appName);
       } catch (error) {
@@ -1020,9 +1017,7 @@ export function createLedgerController(
       openingAppRequirement = null;
       connector = null;
       connectorRequirement = null;
-      context = { ...context, activeApp: active };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_OPENED_RAW', appInfo: active });
     }),
 
     closeApp: (): Promise<void> => enqueue(async () => {
@@ -1031,11 +1026,9 @@ export function createLedgerController(
         throw new HWError(HWErrorCode.TRANSPORT_DISCONNECTED, 'Not connected.');
       }
       await deviceCloseApp(transport);
-      context = { ...context, activeApp: null };
       connector = null;
       connectorRequirement = null;
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
     }),
 
     installApp: (
@@ -1049,9 +1042,7 @@ export function createLedgerController(
       // Reset connector — the install primes the device and may switch modes
       connector = null;
       connectorRequirement = null;
-      context = { ...context, activeApp: null };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
 
       const result = await installApp(transport, config, onProgress);
       if (!result.success || result.completedCommands !== result.totalCommands) {
@@ -1435,12 +1426,13 @@ export function createLedgerController(
           return outcome;
         }
         case 'app_not_installed': {
-          lastError = new HWError(
-            HWErrorCode.APP_NOT_INSTALLED,
-            `App "${outcome.appName}" is not installed on the device.`,
-          );
-          state = 'app_missing';
-          emit();
+          send({
+            type: 'APP_MISSING',
+            error: new HWError(
+              HWErrorCode.APP_NOT_INSTALLED,
+              `App "${outcome.appName}" is not installed on the device.`,
+            ),
+          });
           return outcome;
         }
         case 'transport_lost': {
@@ -1500,9 +1492,7 @@ export function createLedgerController(
       } finally {
         invalidateSessions();
         connector = null;
-        state = 'disposed';
-        context = createInitialContext(context.mode);
-        emit();
+        send({ type: 'DISPOSE' });
       }
       if (disconnectError !== undefined) {
         throw disconnectError instanceof Error

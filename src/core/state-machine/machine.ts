@@ -116,7 +116,10 @@ export function transition(
 
   // App availability is orthogonal to sub-state — surface it from any state.
   if (event.type === 'APP_MISSING') {
-    return { state: 'app_missing', context: ctx };
+    return {
+      state: 'app_missing',
+      context: { ...ctx, ...(event.error !== undefined ? { error: event.error } : {}) },
+    };
   }
   if (event.type === 'APP_OUTDATED') {
     return {
