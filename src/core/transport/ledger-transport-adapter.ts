@@ -2,11 +2,11 @@
  * Ledger transport adapter.
  *
  * Bridges between our HWTransport interface and the @ledgerhq/hw-transport
- * base class expected by hw-app-eth and hw-app-btc.
+ * base class expected by hw-app-eth.
  *
- * The Ledger SDK apps (Eth, Btc) require a Transport instance from
+ * The Ledger Ethereum SDK app requires a Transport instance from
  * @ledgerhq/hw-transport. This adapter wraps our HWTransport so we can
- * pass it to those SDK classes.
+ * pass it to that SDK class.
  */
 
 import Transport from '@ledgerhq/hw-transport';

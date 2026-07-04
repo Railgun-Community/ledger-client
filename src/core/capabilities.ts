@@ -29,8 +29,6 @@ export const CAPABILITY_STATUS = {
   railgunSigning: 'experimental',
   /** Ethereum tx / message / EIP-712 signing. */
   ethereumSigning: 'experimental',
-  /** Bitcoin signing via `@ledgerhq/hw-app-btc`. */
-  bitcoinSigning: 'experimental',
   /** FROST / MPC threshold signing — NOT implemented on current firmware. */
   frost: 'unsupported',
   /** EIP-7702 authorization + RelayAdapt7702 signing — being built. */

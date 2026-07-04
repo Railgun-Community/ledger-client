@@ -2,7 +2,7 @@
  * Ledger transport adapter tests.
  *
  * Tests the bridge between our HWTransport and the @ledgerhq/hw-transport
- * base class expected by hw-app-eth / hw-app-btc.
+ * base class expected by hw-app-eth.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';

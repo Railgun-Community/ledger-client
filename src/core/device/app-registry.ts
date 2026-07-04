@@ -21,16 +21,8 @@ export const ETH_APP: AppRequirement = {
   cla: 0xe0,
 };
 
-/** Standard Bitcoin app requirement. */
-export const BTC_APP: AppRequirement = {
-  name: 'Bitcoin',
-  minVersion: '2.2.0',
-  cla: 0xe1, // Note: BTC new app uses 0xe1, legacy uses 0xe0
-};
-
 /** All known app requirements indexed by name. */
 export const APP_REGISTRY: ReadonlyMap<string, AppRequirement> = new Map([
   [RAILGUN_APP.name, RAILGUN_APP],
   [ETH_APP.name, ETH_APP],
-  [BTC_APP.name, BTC_APP],
 ]);

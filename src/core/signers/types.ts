@@ -4,13 +4,12 @@
  * Abstracts signing operations across different protocols:
  * - RAILGUN (BabyJubjub EdDSA via custom APDU)
  * - ETH (standard Ethereum signing via hw-app-eth)
- * - BTC (Bitcoin signing via hw-app-btc)
  */
 
 import type { Signature, PublicInputsRailgun } from '../connector/types.js';
 
 /** Discriminator for signer type. */
-export type SignerType = 'railgun' | 'eth' | 'btc';
+export type SignerType = 'railgun' | 'eth';
 
 /** Result of a RAILGUN sign operation. */
 export type RailgunSignResult = {
@@ -26,14 +25,8 @@ export type EthSignResult = {
   readonly s: string;
 };
 
-/** Result of a BTC sign operation. */
-export type BtcSignResult = {
-  readonly type: 'btc';
-  readonly signatures: readonly string[];
-};
-
 /** Union of all sign results. */
-export type SignResult = RailgunSignResult | EthSignResult | BtcSignResult;
+export type SignResult = RailgunSignResult | EthSignResult;
 
 /** RAILGUN sign request payload. */
 export type RailgunSignRequest = {

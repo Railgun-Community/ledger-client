@@ -26,7 +26,7 @@ Source of truth in `src/core` and `src/validation`.
 Responsibilities:
 - transport implementations (WebHID, Node HID, and a mock for tests)
 - dashboard / device / app commands
-- signer implementations (RAILGUN, ETH, BTC)
+- signer implementations (RAILGUN, ETH)
 - APDU building, parsing, and validation
 - typed hardware errors
 - pure state-machine transitions

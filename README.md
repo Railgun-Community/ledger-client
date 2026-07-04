@@ -72,7 +72,7 @@ src/
 │   ├── connector/      # Engine-facing HardwareConnector adapter
 │   ├── transport/      # APDU wire format, WebHID/NodeHID adapters, factory
 │   ├── device/         # Device info, app registry, open/close/list apps
-│   ├── signers/        # RAILGUN, ETH signers (BTC signer internal, not yet exported)
+│   ├── signers/        # RAILGUN + ETH signers
 │   ├── installer/      # SCP channel, ELF parser, APDU script runner, crypto
 │   ├── state-machine/  # Pure FSM (typed states, events, guards)
 │   └── errors.ts       # Typed error codes
@@ -182,7 +182,7 @@ npx tsx scripts/test-install-verify.ts  # SCP install + verify
 
 **Trust boundaries enforced.** Validators sit at the engine↔connector and browser↔device boundaries. All external data (APDU responses, user uploads, public inputs) is validated before use.
 
-**Lazy imports.** Ledger SDK apps (`hw-app-eth`, `hw-app-btc`) are dynamically imported so unused signers are tree-shaken.
+**Lazy imports.** The Ledger Ethereum app (`hw-app-eth`) is dynamically imported so it's tree-shaken when unused.
 
 **Browser-compatible crypto.** The SCP installer uses `@noble/ciphers`, `@noble/curves`, `@noble/hashes` — no Node.js crypto dependency.
 
