@@ -28,12 +28,16 @@ export const MOCK_32_BYTES = new Uint8Array(32).fill(0x01);
 /** Synthetic public key response (64 bytes: x + y). */
 export const MOCK_PUBLIC_KEY_RESPONSE = new Uint8Array(64).fill(0xaa);
 
-/** Synthetic sign response (97 bytes: prefix + R8.x + R8.y + S). */
+/**
+ * Synthetic sign response (97 bytes: prefix + R8.x + R8.y + S).
+ * R8 = (0, 1) — the twisted-Edwards neutral point, on the BabyJubjub curve — and
+ * S = 7, inside the prime-order subgroup, so it passes signature validation.
+ */
 export const MOCK_SIGN_RESPONSE = new Uint8Array(97);
-MOCK_SIGN_RESPONSE[0] = 0x00;                                    // prefix byte
-MOCK_SIGN_RESPONSE.set(new Uint8Array(32).fill(0x11), 1);        // R8.x
-MOCK_SIGN_RESPONSE.set(new Uint8Array(32).fill(0x22), 33);       // R8.y
-MOCK_SIGN_RESPONSE.set(new Uint8Array(32).fill(0x33), 65);       // S
+MOCK_SIGN_RESPONSE[0] = 0x00;   // prefix byte
+// R8.x = 0 (bytes 1..32 remain zero); R8.y = 1 (big-endian LSB at byte 64); S = 7.
+MOCK_SIGN_RESPONSE[64] = 0x01;  // R8.y
+MOCK_SIGN_RESPONSE[96] = 0x07;  // S
 
 // ─── Common response fixtures ─────────────────────────────────────────────────
 
