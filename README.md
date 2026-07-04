@@ -8,7 +8,6 @@ State-machine-driven hardware wallet connector for RAILGUN — Ledger-first, bro
 - Signs RAILGUN transactions (BabyJubjub EdDSA via custom Ledger app)
 - Signs ETH transactions, messages, EIP-712 typed data, fixed shield ownership markers, and EIP-7702 authorizations
 - Preloads and signs with the RAILGUN app 7702 EOA path `m/7702'/1984'/account'/chainId/ephemeralIndex`
-- Signs BTC transactions via `@ledgerhq/hw-app-btc`
 - Installs sideloaded apps via SCP02/SCP03 secure channel
 - Exposes a `HardwareConnector` interface compatible with the RAILGUN engine
 - Drives its behavior through a pure finite state machine — no framework required
@@ -29,6 +28,14 @@ import { CAPABILITY_STATUS } from '@railgun-community/ledger-client';
 // { installer: 'experimental', keyAttestation: 'experimental',
 //   frost: 'unsupported', eip7702: 'under-development', ... }
 ```
+
+## Documentation
+
+Full docs live in [`docs/`](docs/README.md):
+
+- **[Getting started](docs/getting-started.md)** — install → connect → first signature
+- [Architecture](docs/architecture.md) · [Examples](docs/examples.md) · [Troubleshooting](docs/troubleshooting.md)
+- API: [controller](docs/api/controller.md) · [engine](docs/api/engine.md) · [signers](docs/api/signers.md) · [transport](docs/api/transport.md) · [installer keys](docs/api/installer-keys.md)
 
 ## Installing (pre-release)
 
@@ -65,7 +72,7 @@ src/
 │   ├── connector/      # Engine-facing HardwareConnector adapter
 │   ├── transport/      # APDU wire format, WebHID/NodeHID adapters, factory
 │   ├── device/         # Device info, app registry, open/close/list apps
-│   ├── signers/        # RAILGUN, ETH, BTC signing + EIP-7702 whitelist
+│   ├── signers/        # RAILGUN, ETH signers (BTC signer internal, not yet exported)
 │   ├── installer/      # SCP channel, ELF parser, APDU script runner, crypto
 │   ├── state-machine/  # Pure FSM (typed states, events, guards)
 │   └── errors.ts       # Typed error codes
@@ -113,7 +120,7 @@ await installApp(transport, { apduData, elfData, rootPrivateKey, scp: true });
 ```
 
 An SCP install with no injected key fails fast with a clear error. See
-**[docs/INSTALLER-KEYS.md](docs/INSTALLER-KEYS.md)** for the full walkthrough — key
+**[docs/api/installer-keys.md](docs/api/installer-keys.md)** for the full walkthrough — key
 generation, custody, the attestation format, verification, and binding an attestation to
 specific app builds.
 

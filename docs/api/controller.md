@@ -26,6 +26,8 @@ type LedgerController = {
   getPublicKey(): Promise<{ x: bigint; y: bigint }>;
   getWalletArtifacts(): Promise<RailgunWalletArtifacts>;
   sign(expectedHash: bigint, publicInputs?: PublicInputsRailgun, subSession?: string): Promise<Signature>;
+  signShieldOwnershipMarker?(derivationIndex: number): Promise<ShieldOwnershipMarkerResult>;
+  signEthTransaction(rawTxHex: string, derivationIndex: number): Promise<EthSignResult>;
   requestBatchApproval(requests: readonly RequestApprovalOptions[]): Promise<LedgerBatchApprovalSession>;
   approveCurrentAction(): boolean;
   rejectCurrentAction(reason?: Error): boolean;

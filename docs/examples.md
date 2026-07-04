@@ -20,75 +20,14 @@ if (controller.getSnapshot().modal.kind === 'review_sign') {
 const signature = await signPromise;
 ```
 
-## React Provider
+## React usage
 
-```tsx
-import { LedgerProvider, useLedger } from '@railgun-community/ledger-client-react';
-import { RAILGUN_APP } from '@railgun-community/ledger-client';
-
-function App() {
-  return (
-    <LedgerProvider requiredApps={[RAILGUN_APP]} enableDefaultModals>
-      <WalletPage />
-    </LedgerProvider>
-  );
-}
-
-function WalletPage() {
-  const { ensureReady, snapshot } = useLedger();
-
-  return (
-    <div>
-      <button onClick={() => void ensureReady()}>
-        Connect hardware
-      </button>
-      <p>Readiness: {snapshot.readiness}</p>
-    </div>
-  );
-}
-```
-
-## Custom Modal UI
-
-```tsx
-import { LedgerProvider, useLedger, useLedgerModals } from '@railgun-community/ledger-client-react';
-
-function CustomWallet() {
-  return (
-    <LedgerProvider enableDefaultModals={false}>
-      <WalletView />
-      <WalletModals />
-    </LedgerProvider>
-  );
-}
-
-function WalletModals() {
-  const { intent } = useLedgerModals();
-  const { approveCurrentAction, rejectCurrentAction, connect, ensureReady } = useLedger();
-
-  if (intent.kind === 'none') return null;
-
-  if (intent.kind === 'connect_hardware') {
-    return <button onClick={() => void connect()}>Connect Ledger</button>;
-  }
-
-  if (intent.kind === 'open_required_app') {
-    return <button onClick={() => void ensureReady()}>Check app again</button>;
-  }
-
-  if (intent.kind === 'review_sign') {
-    return (
-      <div>
-        <p>Hash: {intent.hash.toString(16)}</p>
-        <button onClick={() => approveCurrentAction()}>Approve</button>
-        <button onClick={() => rejectCurrentAction()}>Reject</button>
-      </div>
-    );
-  }
-
-  return null;
-}
-```
+React bindings are **not** part of this package. For `LedgerProvider`, the hooks
+(`useLedger`, `useLedgerStatus`, `useLedgerConnector`, `useLedgerModals`), and the default
+`LedgerModalHost`, use
+[`@railgun-community/ledger-client-react`](https://github.com/Railgun-Community/ledger-client-react).
+That package builds its provider and hooks on the headless `LedgerController` shown above —
+the `snapshot` / `modal-intent` model is the same, just wrapped in React state.
 
 ## Engine Adapter
 
@@ -193,7 +132,7 @@ This is the supported way to unit-test the controller layer without browser WebH
 ## Installer root keys & attestation
 
 No installer root key is bundled — you generate one and inject it. See
-[INSTALLER-KEYS.md](./INSTALLER-KEYS.md) for the full guide; the essentials:
+[the installer-keys guide](./api/installer-keys.md) for the full guide; the essentials:
 
 ```ts
 import {
