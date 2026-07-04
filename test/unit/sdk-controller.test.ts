@@ -204,6 +204,34 @@ describe('createLedgerController', () => {
     expect(controller.getSnapshot().machineState).toBe('batch_signing_n');
   });
 
+  it('rejects a batch sign that omits publicInputs (item cannot be verified against the approved set)', async () => {
+    const controller = createController();
+    enqueueReadyResponses();
+
+    const approvalPromise = controller.requestBatchApproval([
+      {
+        id: 'req-1',
+        description: 'batch sign request',
+        hash: 1n,
+        publicInputs: {
+          merkleRoot: 2n,
+          boundParamsHash: 3n,
+          nullifiers: [4n],
+          commitmentsOut: [5n],
+        },
+      },
+    ]);
+    await waitForState(() => controller.getSnapshot().machineState, 'batch_reviewing');
+    expect(controller.approveCurrentAction()).toBe(true);
+    const session = await approvalPromise;
+
+    // Valid session token, but no publicInputs → the signature cannot be bound to
+    // the reviewed item, so it must be rejected (not signed blind under the session).
+    await expect(controller.sign(1n, undefined, session.subSession)).rejects.toMatchObject({
+      code: 'BATCH_REJECTED',
+    });
+  });
+
   it('rejects pending sign requests through rejectCurrentAction', async () => {
     const controller = createController();
     enqueueReadyResponses();

@@ -256,6 +256,23 @@ export function createLedgerController(
     return JSON.stringify(normalized);
   }
 
+  /**
+   * Digest of a single sign item — its hash + public inputs. Used to verify a
+   * per-item sign request against the approved batch set (independent of the
+   * request id/description, which the sign call itself does not carry).
+   */
+  function computeItemDigest(hash: bigint, publicInputs: PublicInputsRailgun): string {
+    return JSON.stringify({
+      hash: hashBigint(hash),
+      publicInputs: {
+        merkleRoot: hashBigint(publicInputs.merkleRoot),
+        boundParamsHash: hashBigint(publicInputs.boundParamsHash),
+        nullifiers: publicInputs.nullifiers.map(hashBigint),
+        commitmentsOut: publicInputs.commitmentsOut.map(hashBigint),
+      },
+    });
+  }
+
   function getRequiredApp(
     override?: AppRequirement,
   ): AppRequirement {
@@ -884,6 +901,26 @@ export function createLedgerController(
       ) {
         activeApprovalSession = null;
         throw new HWError(HWErrorCode.BATCH_REJECTED, 'Batch approval session expired.');
+      }
+      // Bind the signature to the REVIEWED batch: verify this exact (hash,
+      // publicInputs) item was part of the approved set — not merely that a valid
+      // session token was presented. A post-approval item swap is rejected here.
+      if (publicInputs === undefined) {
+        throw new HWError(
+          HWErrorCode.BATCH_REJECTED,
+          'Batch signing requires publicInputs to verify the item against the approved set.',
+        );
+      }
+      const approvedRequests = context.pendingBatchRequests?.requests ?? [];
+      const itemDigest = computeItemDigest(expectedHash, publicInputs);
+      const isApproved = approvedRequests.some(
+        (request) => computeItemDigest(request.hash, request.publicInputs) === itemDigest,
+      );
+      if (!isApproved) {
+        throw new HWError(
+          HWErrorCode.BATCH_REJECTED,
+          'Signing request was not part of the approved batch.',
+        );
       }
     }
 
