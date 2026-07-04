@@ -38,6 +38,19 @@ export default tseslint.config(
     },
   },
   {
+    // Scripts are node CLIs run via tsx. Keep syntactic linting but drop the
+    // type-checked rules (full type-checking is done by `tsc -p tsconfig.scripts.json`).
+    files: ['scripts/**/*.ts'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: false, project: false },
+    },
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+    },
+  },
+  {
     ignores: [
       'dist/',
       'node_modules/',

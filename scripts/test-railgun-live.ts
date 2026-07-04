@@ -31,11 +31,9 @@ import { RailgunSigner } from '../src/core/signers/railgun-signer.js';
 import {
   RAILGUN_CLA,
   RailgunAppINS,
-  encodeAccountIndex,
   buildGetPublicKey,
   buildSignHash,
   SIGN_RESPONSE_LENGTH,
-  PUBLIC_KEY_RESPONSE_LENGTH,
 } from '../src/core/transport/apdu.js';
 import { BABYJUBJUB_FIELD_PRIME, BABYJUBJUB_SUBGROUP_ORDER } from '../src/validation/signature.js';
 import { deserializeApduResponse } from '../src/core/transport/apdu-wire.js';

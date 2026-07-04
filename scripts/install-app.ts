@@ -80,12 +80,12 @@ async function main(): Promise<void> {
       transport,
       {
         apduData,
-        elfData,
-        rootPrivateKey,
         scp: args.scp,
-        targetId: args.targetId,
         retryCount: args.retryCount,
         retryDelayMs: args.retryDelayMs,
+        ...(elfData !== undefined ? { elfData } : {}),
+        ...(rootPrivateKey !== undefined ? { rootPrivateKey } : {}),
+        ...(args.targetId !== undefined ? { targetId: args.targetId } : {}),
       },
       (progress) => {
         if (progress.phase === 'installing' && progress.total > 0) {
@@ -155,19 +155,19 @@ function parseArgs(argv: string[]): CliArgs {
         i++;
         break;
       case '--apduFile':
-        result.apduFile = next;
+        if (next !== undefined) { result.apduFile = next; }
         i++;
         break;
       case '--elfFile':
-        result.elfFile = next;
+        if (next !== undefined) { result.elfFile = next; }
         i++;
         break;
       case '--rootPrivateKey':
-        result.rootPrivateKey = next;
+        if (next !== undefined) { result.rootPrivateKey = next; }
         i++;
         break;
       case '--rootKeyFile':
-        result.rootKeyFile = next;
+        if (next !== undefined) { result.rootKeyFile = next; }
         i++;
         break;
       case '--scp':
@@ -197,7 +197,10 @@ function parseArgs(argv: string[]): CliArgs {
 
 function resolveArtifactArgs(args: CliArgs): { readonly apduFile?: string; readonly elfFile?: string } {
   if (args.target === undefined) {
-    return { apduFile: args.apduFile, elfFile: args.elfFile };
+    return {
+      ...(args.apduFile !== undefined ? { apduFile: args.apduFile } : {}),
+      ...(args.elfFile !== undefined ? { elfFile: args.elfFile } : {}),
+    };
   }
   const target = TARGET_ARTIFACTS[args.target];
   return {
