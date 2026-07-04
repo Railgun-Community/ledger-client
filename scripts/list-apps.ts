@@ -30,7 +30,6 @@ const APP_NAME = 'RAILGUN';
 const RAILGUN_CLA = 0xe0;
 const INS_GET_PUBLIC_KEY = 0x01;   // INS_SPENDING_PUBKEY
 const INS_SIGN_HASH = 0x12;       // INS_SIGN_DISPLAY
-const INS_GET_VIEWING_KEY = 0x13; // INS_VIEWING_PRIVKEY_DISPLAY
 
 async function main(): Promise<void> {
   const flags = new Set(process.argv.slice(2));

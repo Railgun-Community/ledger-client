@@ -83,10 +83,10 @@ async function main(): Promise<void> {
       transport,
       {
         apduData,
-        elfData,
         rootPrivateKey,
         scp: true,
         prime: true,
+        ...(elfData !== undefined ? { elfData } : {}),
       },
       (p) => {
         if (p.phase === 'installing' && p.total > 0) {

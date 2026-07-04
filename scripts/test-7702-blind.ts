@@ -172,7 +172,6 @@ async function main(): Promise<void> {
     if (controlSw === 0x9000) {
       const parity = controlResp[0];
       const r = bufToHex(controlResp.slice(1, 33));
-      const s = bufToHex(controlResp.slice(33, 65));
       console.log(`  ✓ Whitelisted signing succeeded: yParity=${parity}, r=0x${r.slice(0, 8)}...`);
     } else if (controlSw === 0x6982) {
       console.log(`  ✗ User rejected on device (0x6982) — that's expected if you declined`);
