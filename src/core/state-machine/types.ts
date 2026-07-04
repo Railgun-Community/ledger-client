@@ -86,6 +86,14 @@ export type MachineEvent =
   | { type: 'BATCH_SIGN_REQUEST'; requests: readonly RequestApprovalOptions[] }
   | { type: 'ETH_SIGN_REQUEST' }
   | { type: 'ETH_SIGN_COMPLETE' }
+  | { type: 'APP_MISSING' }
+  | { type: 'APP_OUTDATED' }
+  | { type: 'APP_OPEN_FAILED' }
+  | { type: 'OPEN_APP_REQUEST' }
+  | { type: 'APP_CLOSED' }
+  | { type: 'APP_OPENED_RAW'; appInfo: ActiveAppInfo }
+  | { type: 'INSTALL_BEGIN' }
+  | { type: 'DISPOSE' }
   // Transport/device-initiated
   | { type: 'TRANSPORT_CONNECTED' }
   | { type: 'TRANSPORT_DISCONNECTED' }

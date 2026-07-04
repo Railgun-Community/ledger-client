@@ -394,8 +394,7 @@ export function createLedgerController(
       throw error;
     }
     if (error.code === HWErrorCode.APP_NOT_INSTALLED) {
-      state = 'app_missing';
-      emit();
+      send({ type: 'APP_MISSING' });
       throw error;
     }
     if (error.code === HWErrorCode.TRANSPORT_TIMEOUT) {
@@ -410,9 +409,7 @@ export function createLedgerController(
       send({ type: 'TRANSPORT_ERROR', error });
       throw error;
     }
-    state = 'error.app_error';
-    context = { ...context, lastSafeState: 'device_ready' };
-    emit();
+    send({ type: 'APP_OPEN_FAILED' });
     throw error;
   }
 

@@ -114,6 +114,19 @@ export function transition(
     };
   }
 
+  // App availability is orthogonal to sub-state — surface it from any state.
+  if (event.type === 'APP_MISSING') {
+    return { state: 'app_missing', context: ctx };
+  }
+  if (event.type === 'APP_OUTDATED') {
+    return { state: 'app_outdated', context: { ...ctx, lastSafeState: 'device_ready' } };
+  }
+
+  // DISPOSE from any non-terminal state → terminal.
+  if (event.type === 'DISPOSE') {
+    return { state: 'disposed', context: createInitialContext(ctx.mode) };
+  }
+
   // RESET from error states → disconnected
   if (event.type === 'RESET' && state.startsWith('error.')) {
     return {
@@ -395,6 +408,18 @@ function handleOpeningApp(
         ...(event.error !== undefined ? { error: event.error } : {}),
         lastSafeState: 'device_ready',
       },
+    };
+  }
+  if (event.type === 'APP_OPEN_FAILED') {
+    return {
+      state: 'error.app_error',
+      context: { ...ctx, lastSafeState: 'device_ready' },
+    };
+  }
+  if (event.type === 'APP_OPENED_RAW') {
+    return {
+      state: 'device_ready',
+      context: { ...ctx, activeApp: event.appInfo, lastSafeState: 'device_ready' },
     };
   }
   return { state: 'opening_app', context: ctx };
