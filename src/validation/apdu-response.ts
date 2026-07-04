@@ -8,6 +8,7 @@
 import type { ApduResponse } from '../core/transport/types.js';
 import { StatusWord } from '../core/transport/types.js';
 import { HWError, HWErrorCode } from '../core/errors.js';
+import { statusWordToHWError } from '../core/transport/status-words.js';
 import type { Signature } from '../core/connector/types.js';
 import {
   PUBLIC_KEY_RESPONSE_LENGTH,
@@ -22,32 +23,7 @@ export function validateApduResponse(response: ApduResponse): void {
   if (response.statusWord === StatusWord.SUCCESS) {
     return;
   }
-
-  if (response.statusWord === StatusWord.USER_REJECTED) {
-    throw new HWError(
-      HWErrorCode.APDU_REJECTED,
-      `Device rejected operation (SW: 0x${response.statusWord.toString(16)})`,
-    );
-  }
-
-  if (response.statusWord === StatusWord.LOCKED_DEVICE) {
-    throw new HWError(
-      HWErrorCode.APDU_STATUS_ERROR,
-      'Device is locked. Unlock and retry.',
-    );
-  }
-
-  if (response.statusWord === StatusWord.APP_NOT_OPEN) {
-    throw new HWError(
-      HWErrorCode.APDU_STATUS_ERROR,
-      'Required app is not open on the device.',
-    );
-  }
-
-  throw new HWError(
-    HWErrorCode.APDU_STATUS_ERROR,
-    `APDU error (SW: 0x${response.statusWord.toString(16)})`,
-  );
+  throw statusWordToHWError(response.statusWord);
 }
 
 /**
