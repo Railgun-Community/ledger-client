@@ -172,6 +172,24 @@ describe('createLedgerController', () => {
     expect(controller.getSnapshot().machineState).toBe('signer_idle');
   });
 
+  it('approve then a stray reject: the reject is a no-op and the signature still completes', async () => {
+    const controller = createController();
+    enqueueReadyResponses();
+    transport.enqueueResponse(successResponse(buildAppVersionResponse('RAILGUN', '0.1.0')));
+    transport.enqueueResponse(successResponse(buildSignResponse(0n, 1n, 7n)));
+
+    const signPromise = controller.sign(12345n);
+    await waitForState(() => controller.getSnapshot().machineState, 'reviewing');
+
+    expect(controller.approveCurrentAction()).toBe(true);
+    // A stray reject after approve must not settle the already-approved action.
+    expect(controller.rejectCurrentAction(new Error('late cancel'))).toBe(false);
+
+    const signature = await signPromise;
+    expect(signature.S).toBe(7n);
+    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+  });
+
   it('creates a batch approval session after explicit approval', async () => {
     const controller = createController();
     enqueueReadyResponses();
@@ -200,6 +218,33 @@ describe('createLedgerController', () => {
 
     expect(session.approved).toBe(true);
     expect(session.subSession.length).toBeGreaterThan(0);
+    expect(controller.getSnapshot().approvalSession?.subSession).toBe(session.subSession);
+    expect(controller.getSnapshot().machineState).toBe('batch_signing_n');
+  });
+
+  it('a stray reject during batch signing is a no-op and preserves the approval session', async () => {
+    const controller = createController();
+    enqueueReadyResponses();
+
+    const approvalPromise = controller.requestBatchApproval([
+      {
+        id: 'req-1',
+        description: 'batch sign request',
+        hash: 1n,
+        publicInputs: {
+          merkleRoot: 2n,
+          boundParamsHash: 3n,
+          nullifiers: [4n],
+          commitmentsOut: [5n],
+        },
+      },
+    ]);
+    await waitForState(() => controller.getSnapshot().machineState, 'batch_reviewing');
+    expect(controller.approveCurrentAction()).toBe(true);
+    const session = await approvalPromise;
+
+    // A stray reject once signing has started must not tear down the session.
+    expect(controller.rejectCurrentAction(new Error('stray'))).toBe(false);
     expect(controller.getSnapshot().approvalSession?.subSession).toBe(session.subSession);
     expect(controller.getSnapshot().machineState).toBe('batch_signing_n');
   });

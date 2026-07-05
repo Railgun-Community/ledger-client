@@ -798,8 +798,10 @@ export function createLedgerController(
       return {
         kind: 'signing_progress',
         step: 'awaiting_device',
-        ...(pendingAction?.kind === 'sign'
-          ? { hash: pendingAction.hash }
+        // Source the hash from FSM context (which survives approval settling the
+        // pending-action slot), not from the transient `pendingAction`.
+        ...(context.pendingSignRequest !== null
+          ? { hash: context.pendingSignRequest.hash }
           : {}),
       };
     }
@@ -1403,15 +1405,22 @@ export function createLedgerController(
         return false;
       }
 
-      if (pendingAction.kind === 'sign') {
+      // Settle the pending-action slot BEFORE resolving so a re-entrant
+      // approve/reject (double-click, or a stray call while the queued sign is
+      // in-flight) sees no pending action and is a no-op. The queued sign no
+      // longer relies on `pendingAction` once its promise has resolved.
+      const action = pendingAction;
+      pendingAction = null;
+
+      if (action.kind === 'sign') {
         send({ type: 'APPROVE_SIGN' });
-        pendingAction.resolve();
+        action.resolve();
         return true;
       }
 
       send({ type: 'APPROVE_BATCH' });
-      activeApprovalSession = pendingAction.session;
-      pendingAction.resolve(pendingAction.session);
+      activeApprovalSession = action.session;
+      action.resolve(action.session);
       return true;
     },
 
@@ -1509,7 +1518,12 @@ export function createLedgerController(
         connectorRequirement = null;
         deviceSessionId = null;
         activeApprovalSession = null;
-        pendingAction = null;
+        if (pendingAction !== null) {
+          pendingAction.reject(
+            new HWError(HWErrorCode.TRANSPORT_DISCONNECTED, 'Controller error cleared.'),
+          );
+          pendingAction = null;
+        }
         send({ type: 'DISCONNECT' });
         if (activeTransport !== null) {
           void disconnectTransport(activeTransport, { swallowErrors: true });
