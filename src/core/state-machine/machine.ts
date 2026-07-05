@@ -114,6 +114,29 @@ export function transition(
     };
   }
 
+  // App availability is orthogonal to sub-state — surface it from any state.
+  if (event.type === 'APP_MISSING') {
+    return {
+      state: 'app_missing',
+      context: { ...ctx, ...(event.error !== undefined ? { error: event.error } : {}) },
+    };
+  }
+  if (event.type === 'APP_OUTDATED') {
+    return {
+      state: 'app_outdated',
+      context: {
+        ...ctx,
+        ...(event.appInfo !== undefined ? { activeApp: event.appInfo } : {}),
+        lastSafeState: 'device_ready',
+      },
+    };
+  }
+
+  // DISPOSE from any non-terminal state → terminal.
+  if (event.type === 'DISPOSE') {
+    return { state: 'disposed', context: createInitialContext(ctx.mode) };
+  }
+
   // RESET from error states → disconnected
   if (event.type === 'RESET' && state.startsWith('error.')) {
     return {
@@ -245,8 +268,18 @@ export function transition(
       return { state, context: ctx };
 
     default:
-      return { state, context: ctx };
+      return assertExhaustive(state, ctx);
   }
+}
+
+/**
+ * Compile-time exhaustiveness guard: every non-terminal `MachineState` must have
+ * an explicit handler in the switch above. If a new state is added without one,
+ * `state` is no longer `never` here and this fails to type-check. At runtime an
+ * unexpected state is returned unchanged (no behavior change from before).
+ */
+function assertExhaustive(state: never, ctx: MachineContext): TransitionResult {
+  return { state, context: ctx };
 }
 
 // ─── State handlers ─────────────────────────────────────────────────────────
@@ -288,6 +321,18 @@ function handleQueryingDevice(
       context: { ...ctx, deviceInfo: event.info },
     };
   }
+  if (event.type === 'APP_OPENED') {
+    return {
+      state: 'signer_idle',
+      context: { ...ctx, activeApp: event.appInfo, lastSafeState: 'signer_idle' },
+    };
+  }
+  if (event.type === 'APP_CLOSED') {
+    return { state: 'device_ready', context: { ...ctx, activeApp: null } };
+  }
+  if (event.type === 'OPEN_APP_REQUEST') {
+    return { state: 'opening_app', context: ctx };
+  }
   return { state: 'querying_device', context: ctx };
 }
 
@@ -301,6 +346,18 @@ function handleDeviceReady(
       state: 'app_check',
       context: { ...ctx, installedApps: event.apps },
     };
+  }
+  if (event.type === 'APP_OPENED') {
+    return {
+      state: 'signer_idle',
+      context: { ...ctx, activeApp: event.appInfo, lastSafeState: 'signer_idle' },
+    };
+  }
+  if (event.type === 'OPEN_APP_REQUEST') {
+    return { state: 'opening_app', context: ctx };
+  }
+  if (event.type === 'APP_CLOSED') {
+    return { state: 'device_ready', context: { ...ctx, activeApp: null } };
   }
   if (event.type === 'SWITCH_MODE') {
     if (event.mode === 'installer') {
@@ -387,6 +444,18 @@ function handleOpeningApp(
       },
     };
   }
+  if (event.type === 'APP_OPEN_FAILED') {
+    return {
+      state: 'error.app_error',
+      context: { ...ctx, lastSafeState: 'device_ready' },
+    };
+  }
+  if (event.type === 'APP_OPENED_RAW') {
+    return {
+      state: 'device_ready',
+      context: { ...ctx, activeApp: event.appInfo, lastSafeState: 'device_ready' },
+    };
+  }
   return { state: 'opening_app', context: ctx };
 }
 
@@ -416,6 +485,18 @@ function handleSignerIdle(
         batchIndex: 0,
       },
     };
+  }
+  if (event.type === 'ETH_SIGN_REQUEST') {
+    return {
+      state: 'eth_confirming',
+      context: { ...ctx, lastSafeState: 'signer_idle' },
+    };
+  }
+  if (event.type === 'OPEN_APP_REQUEST') {
+    return { state: 'opening_app', context: ctx };
+  }
+  if (event.type === 'APP_CLOSED') {
+    return { state: 'device_ready', context: { ...ctx, activeApp: null } };
   }
   if (event.type === 'SWITCH_MODE') {
     if (event.mode === 'installer') {
@@ -608,7 +689,7 @@ function handleEthConfirming(
   ctx: MachineContext,
   event: MachineEvent,
 ): TransitionResult {
-  if (event.type === 'SIGN_COMPLETE') {
+  if (event.type === 'SIGN_COMPLETE' || event.type === 'ETH_SIGN_COMPLETE') {
     return { state: 'eth_complete', context: ctx };
   }
   if (event.type === 'DEVICE_REJECTED') {

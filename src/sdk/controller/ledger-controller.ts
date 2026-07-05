@@ -394,8 +394,7 @@ export function createLedgerController(
       throw error;
     }
     if (error.code === HWErrorCode.APP_NOT_INSTALLED) {
-      state = 'app_missing';
-      emit();
+      send({ type: 'APP_MISSING', error });
       throw error;
     }
     if (error.code === HWErrorCode.TRANSPORT_TIMEOUT) {
@@ -410,22 +409,16 @@ export function createLedgerController(
       send({ type: 'TRANSPORT_ERROR', error });
       throw error;
     }
-    state = 'error.app_error';
-    context = { ...context, lastSafeState: 'device_ready' };
-    emit();
+    send({ type: 'APP_OPEN_FAILED' });
     throw error;
   }
 
   function beginEthSigning(): void {
-    state = 'eth_confirming';
-    context = { ...context, lastSafeState: 'signer_idle' };
-    emit();
+    send({ type: 'ETH_SIGN_REQUEST' });
   }
 
   function completeEthSigning(): void {
-    state = 'eth_complete';
-    context = { ...context, lastSafeState: 'signer_idle' };
-    emit();
+    send({ type: 'ETH_SIGN_COMPLETE' });
     settleAutoState();
   }
 
@@ -494,9 +487,7 @@ export function createLedgerController(
     const currentApp = await getActiveApp(transport);
     if (currentApp !== null && currentApp.name === requirement.name) {
       if (!isVersionSatisfied(currentApp.version, requirement.minVersion)) {
-        state = 'app_outdated';
-        context = { ...context, activeApp: currentApp };
-        emit();
+        send({ type: 'APP_OUTDATED', appInfo: currentApp });
         throw new HWError(
           HWErrorCode.APP_VERSION_MISMATCH,
           `App version ${currentApp.version} < required ${requirement.minVersion}`,
@@ -504,13 +495,7 @@ export function createLedgerController(
       }
 
       connector = null;
-      state = 'signer_idle';
-      context = {
-        ...context,
-        activeApp: currentApp,
-        lastSafeState: 'signer_idle',
-      };
-      emit();
+      send({ type: 'APP_OPENED', appInfo: currentApp });
       return;
     }
 
@@ -518,15 +503,12 @@ export function createLedgerController(
 
     if (currentApp !== null) {
       await deviceCloseApp(transport);
-      context = { ...context, activeApp: null };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
     }
 
     const deviceInfo: DeviceInfo = await getDeviceInfo(transport);
     context = { ...context, deviceInfo };
-    state = 'opening_app';
-    emit();
+    send({ type: 'OPEN_APP_REQUEST' });
 
     try {
       await deviceOpenApp(transport, requirement.name);
@@ -537,22 +519,14 @@ export function createLedgerController(
     const readyApp = await readVerifiedActiveApp(requirement.name);
 
     if (!isVersionSatisfied(readyApp.version, requirement.minVersion)) {
-      state = 'app_outdated';
-      context = { ...context, activeApp: readyApp };
-      emit();
+      send({ type: 'APP_OUTDATED', appInfo: readyApp });
       throw new HWError(
         HWErrorCode.APP_VERSION_MISMATCH,
         `App version ${readyApp.version} < required ${requirement.minVersion}`,
       );
     }
 
-    state = 'signer_idle';
-    context = {
-      ...context,
-      activeApp: readyApp,
-      lastSafeState: 'signer_idle',
-    };
-    emit();
+    send({ type: 'APP_OPENED', appInfo: readyApp });
   }
 
   async function connectTransport(transportType: TransportType): Promise<void> {
@@ -614,34 +588,24 @@ export function createLedgerController(
     const currentApp = await getActiveApp(transport);
 
     if (currentApp !== null && currentApp.name === requirement.name) {
-      // Fast path: the required app is already open.
-      // GET_VERSION (dashboard command) would fail here, so skip it.
-      // Advance state past querying_device manually.
-      state = 'device_ready';
-
+      // Fast path: the required app is already open. GET_VERSION (dashboard
+      // command) would fail here, so skip straight to the app-open outcome.
       if (!isVersionSatisfied(currentApp.version, requirement.minVersion)) {
-        state = 'app_outdated';
-        context = { ...context, activeApp: currentApp };
-        emit();
+        send({ type: 'APP_OUTDATED', appInfo: currentApp });
         throw new HWError(
           HWErrorCode.APP_VERSION_MISMATCH,
           `App version ${currentApp.version} < required ${requirement.minVersion}`,
         );
       }
 
-      send({ type: 'APP_OPENED', appInfo: currentApp });
-      state = 'signer_idle';
-      context = { ...context, activeApp: currentApp, lastSafeState: 'signer_idle' };
       buildConnector(requirement);
-      emit();
+      send({ type: 'APP_OPENED', appInfo: currentApp });
       return;
     }
 
     if (currentApp !== null) {
       await deviceCloseApp(transport);
-      context = { ...context, activeApp: null };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
     }
 
     // Step 2: Dashboard is active — safe to query device firmware info.
@@ -651,8 +615,7 @@ export function createLedgerController(
     // Step 3: Try to open the required app directly.
     // BOLOS returns 0x6807 (APP_NOT_FOUND) if the app is not installed,
     // which device-manager maps to HWErrorCode.APP_NOT_INSTALLED.
-    state = 'opening_app';
-    emit();
+    send({ type: 'OPEN_APP_REQUEST' });
 
     try {
       await deviceOpenApp(transport, requirement.name);
@@ -664,24 +627,15 @@ export function createLedgerController(
     const readyApp = await readVerifiedActiveApp(requirement.name);
 
     if (!isVersionSatisfied(readyApp.version, requirement.minVersion)) {
-      state = 'app_outdated';
-      context = { ...context, activeApp: readyApp };
-      emit();
+      send({ type: 'APP_OUTDATED', appInfo: readyApp });
       throw new HWError(
         HWErrorCode.APP_VERSION_MISMATCH,
         `App version ${readyApp.version} < required ${requirement.minVersion}`,
       );
     }
 
-    send({ type: 'APP_OPENED', appInfo: readyApp });
-    state = 'signer_idle';
-    context = {
-      ...context,
-      activeApp: readyApp,
-      lastSafeState: 'signer_idle',
-    };
     buildConnector(requirement);
-    emit();
+    send({ type: 'APP_OPENED', appInfo: readyApp });
   }
 
   function mapReadiness(currentState: MachineState): LedgerControllerReadiness {
@@ -1022,10 +976,8 @@ export function createLedgerController(
         disconnectError = error;
       } finally {
         invalidateSessions();
-        context = createInitialContext(context.mode);
-        state = 'disconnected';
+        send({ type: 'DISCONNECT' });
         lastError = null;
-        emit();
         options.onDisconnect?.();
       }
       if (disconnectError !== undefined) {
@@ -1055,8 +1007,7 @@ export function createLedgerController(
         minVersion: '0.0.0',
         cla: 0,
       };
-      state = 'opening_app';
-      emit();
+      send({ type: 'OPEN_APP_REQUEST' });
       try {
         await deviceOpenApp(transport, appName);
       } catch (error) {
@@ -1066,9 +1017,7 @@ export function createLedgerController(
       openingAppRequirement = null;
       connector = null;
       connectorRequirement = null;
-      context = { ...context, activeApp: active };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_OPENED_RAW', appInfo: active });
     }),
 
     closeApp: (): Promise<void> => enqueue(async () => {
@@ -1077,11 +1026,9 @@ export function createLedgerController(
         throw new HWError(HWErrorCode.TRANSPORT_DISCONNECTED, 'Not connected.');
       }
       await deviceCloseApp(transport);
-      context = { ...context, activeApp: null };
       connector = null;
       connectorRequirement = null;
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
     }),
 
     installApp: (
@@ -1095,9 +1042,7 @@ export function createLedgerController(
       // Reset connector — the install primes the device and may switch modes
       connector = null;
       connectorRequirement = null;
-      context = { ...context, activeApp: null };
-      state = 'device_ready';
-      emit();
+      send({ type: 'APP_CLOSED' });
 
       const result = await installApp(transport, config, onProgress);
       if (!result.success || result.completedCommands !== result.totalCommands) {
@@ -1481,12 +1426,13 @@ export function createLedgerController(
           return outcome;
         }
         case 'app_not_installed': {
-          lastError = new HWError(
-            HWErrorCode.APP_NOT_INSTALLED,
-            `App "${outcome.appName}" is not installed on the device.`,
-          );
-          state = 'app_missing';
-          emit();
+          send({
+            type: 'APP_MISSING',
+            error: new HWError(
+              HWErrorCode.APP_NOT_INSTALLED,
+              `App "${outcome.appName}" is not installed on the device.`,
+            ),
+          });
           return outcome;
         }
         case 'transport_lost': {
@@ -1546,9 +1492,7 @@ export function createLedgerController(
       } finally {
         invalidateSessions();
         connector = null;
-        state = 'disposed';
-        context = createInitialContext(context.mode);
-        emit();
+        send({ type: 'DISPOSE' });
       }
       if (disconnectError !== undefined) {
         throw disconnectError instanceof Error
