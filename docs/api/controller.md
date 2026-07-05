@@ -180,6 +180,11 @@ Notes:
 - approval sessions are invalidated on disconnect or reset
 - `dispose()` is terminal
 - `getConnector()` only returns a non-null connector after readiness succeeds
+- **`getConnector().sign()` bypasses the review/approval FSM and the controller
+  queue** — it is for advanced / read-only use (e.g. `getPublicKey`), not user-facing
+  signing. Use `controller.sign()` for anything that must be reviewed and approved. The
+  raw connector has its own internal signing lock that does not compose with the
+  controller queue; never drive signing through both at once.
 
 ## Recommended Usage Pattern
 
