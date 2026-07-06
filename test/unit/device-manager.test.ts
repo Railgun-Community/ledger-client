@@ -144,6 +144,36 @@ function buildAppListPage(...entries: Uint8Array[]): Uint8Array {
   return buf;
 }
 
+/**
+ * Build a GET_VERSION response with raw version bytes (may be invalid UTF-8 or
+ * over-length). mcuLen is set to 0 so the mcuVersion field decodes to ''.
+ */
+function buildVersionResponseRawVersion(versionBytes: Uint8Array): Uint8Array {
+  const buf = new Uint8Array(4 + 1 + versionBytes.length + 4 + 1);
+  buf[4] = versionBytes.length;
+  buf.set(versionBytes, 5);
+  // flags (4B) left zeroed; trailing mcuLen byte left 0 → empty mcuVersion
+  return buf;
+}
+
+/**
+ * Build a GET_APP_AND_VERSION response with raw name/version bytes.
+ */
+function buildAppVersionResponseRaw(
+  nameBytes: Uint8Array,
+  versionBytes: Uint8Array,
+): Uint8Array {
+  const buf = new Uint8Array(1 + 1 + nameBytes.length + 1 + versionBytes.length);
+  let offset = 0;
+  buf[offset++] = 0x01; // format
+  buf[offset++] = nameBytes.length;
+  buf.set(nameBytes, offset);
+  offset += nameBytes.length;
+  buf[offset++] = versionBytes.length;
+  buf.set(versionBytes, offset);
+  return buf;
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('getDeviceInfo', () => {
@@ -292,6 +322,69 @@ describe('closeApp', () => {
     transport.enqueueResponse(errorResponse(StatusWord.CLA_NOT_SUPPORTED));
 
     await expect(closeApp(transport)).resolves.toBeUndefined();
+  });
+});
+
+describe('device-string hardening', () => {
+  // 0xff is never a valid UTF-8 byte; a default TextDecoder would substitute
+  // U+FFFD and hide the corruption. The hardened path must reject it.
+  const invalidUtf8 = new Uint8Array([0xff, 0xfe]);
+
+  it('rejects invalid UTF-8 in the firmware version', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    transport.enqueueResponse(
+      successResponse(buildVersionResponseRawVersion(invalidUtf8)),
+    );
+
+    await expect(getDeviceInfo(transport)).rejects.toMatchObject({
+      code: HWErrorCode.APDU_INVALID_RESPONSE,
+    });
+  });
+
+  it('rejects a firmware version longer than the byte cap', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    // 65 bytes of valid ASCII — valid UTF-8, but past the 64-byte cap.
+    const overLong = new TextEncoder().encode('a'.repeat(65));
+    transport.enqueueResponse(
+      successResponse(buildVersionResponseRawVersion(overLong)),
+    );
+
+    await expect(getDeviceInfo(transport)).rejects.toMatchObject({
+      code: HWErrorCode.APDU_INVALID_RESPONSE,
+    });
+  });
+
+  it('rejects invalid UTF-8 in the active-app name', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    transport.enqueueResponse(
+      successResponse(
+        buildAppVersionResponseRaw(invalidUtf8, new TextEncoder().encode('1.0.0')),
+      ),
+    );
+
+    await expect(getActiveApp(transport)).rejects.toMatchObject({
+      code: HWErrorCode.APDU_INVALID_RESPONSE,
+    });
+  });
+
+  it('accepts a valid multibyte UTF-8 name (does not over-reject)', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    // "café" — the é is a valid 2-byte UTF-8 sequence.
+    const nameBytes = new TextEncoder().encode('café');
+    transport.enqueueResponse(
+      successResponse(
+        buildAppVersionResponseRaw(nameBytes, new TextEncoder().encode('1.0.0')),
+      ),
+    );
+
+    const app = await getActiveApp(transport);
+    expect(app).not.toBeNull();
+    expect(app!.name).toBe('café');
+    expect(app!.version).toBe('1.0.0');
   });
 });
 

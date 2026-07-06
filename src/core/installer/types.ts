@@ -12,7 +12,7 @@ export type AppManifest = {
   readonly name: string;
   readonly version: string;
   readonly targetId: number;
-  /** Path to .hex binary (relative or absolute) */
+  /** Relative path to the .hex binary; no ".." segments or absolute paths (see validateManifest). */
   readonly binaryPath: string;
   /** Data size in bytes */
   readonly dataSize: number;

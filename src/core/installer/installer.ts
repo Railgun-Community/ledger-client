@@ -35,6 +35,7 @@ import {
 import { parseApduScript, countApduCommands, extractAppName, computeAppHash, computeCodeId } from './apdu-parser.js';
 import { tryGetTargetIdFromElf } from './elf-parser.js';
 import { primeDevice } from './prime.js';
+import { parseAppListPage } from '../device/app-list-parser.js';
 import { getDeployedSecretV2, createScpSession } from './scp.js';
 import { ensurePrivateKey32, getPublicKey } from './crypto.js';
 
@@ -462,11 +463,7 @@ async function getDashboardStatus(
  * Returns the parsed app list on success, or undefined if the device is not
  * on the dashboard (transport error, non-9000 SW, etc.).
  *
- * Response format (Nano S Plus / Stax / Flex — BOLOS SDK 2.x):
- *   formatVersion(1)
- *   Per entry:
- *     entryLength(1) sizeInBlocks(2,BE) flags(2) codeHash(32) fullHash(32) nameLen(1) name(N)
- *
+ * Page payloads are decoded by {@link parseAppListPage} (BOLOS SDK 2.x).
  * First page: INS 0xDE, continuation pages: INS 0xDF.
  */
 async function tryListApps(
@@ -502,43 +499,19 @@ async function tryListApps(
 
       onProgress?.({ phase: 'verifying', completed: 0, total: 0, message: `LIST_APPS page ${String(page)}: ${String(data.length)}B payload` });
 
-      let offset = 0;
-
-      // Each page starts with a format-version byte (skip it)
-      offset += 1;
-
-      // Parse entries by reading fields sequentially — the entryLength field
-      // is informational only. The Ledger DMK ignores it for offset control.
       let entryIdx = 0;
-      while (offset + 69 <= data.length) {
-        offset += 1; // skip entryLength
-        offset += 2; // skip sizeInBlocks
-        offset += 2; // skip flags
-
-        const codeHash = bytesToHex(data.subarray(offset, offset + 32));
-        offset += 32;
-
-        const fullHash = bytesToHex(data.subarray(offset, offset + 32));
-        offset += 32;
-
-        if (offset >= data.length) break;
-        const nameLen = data[offset]!;
-        offset += 1;
-        if (offset + nameLen > data.length) break;
-
-        // BOLOS names are null-terminated — strip trailing nulls
-        const rawName = data.subarray(offset, offset + nameLen);
-        const name = new TextDecoder().decode(rawName).replace(/\0+$/g, '');
-        offset += nameLen;
+      for (const entry of parseAppListPage(data)) {
+        const codeHash = bytesToHex(entry.codeHash);
+        const fullHash = bytesToHex(entry.fullHash);
 
         onProgress?.({
           phase: 'verifying',
           completed: 0,
           total: 0,
-          message: `  app ${String(entryIdx)}: "${name}" fullHash=${fullHash.substring(0, 16)}… codeHash=${codeHash.substring(0, 16)}…`,
+          message: `  app ${String(entryIdx)}: "${entry.name}" fullHash=${fullHash.substring(0, 16)}… codeHash=${codeHash.substring(0, 16)}…`,
         });
 
-        apps.push({ name, version: '', hash: fullHash });
+        apps.push({ name: entry.name, version: '', hash: fullHash });
         entryIdx++;
       }
 
