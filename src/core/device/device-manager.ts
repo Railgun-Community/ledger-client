@@ -22,6 +22,8 @@ import {
   buildListApps,
 } from '../transport/dashboard-commands.js';
 import { validateApduResponse } from '../../validation/apdu-response.js';
+import { parseAppListPage } from './app-list-parser.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 
 /**
  * Query device firmware information.
@@ -276,47 +278,15 @@ function decodeDeviceString(bytes: Uint8Array, field: string): string {
 }
 
 /**
- * Parse a LIST_APPS response payload.
- *
- * BOLOS SDK 2.x format (Nano S Plus / Stax / Flex):
- *   formatVersion(1) — skip
- *   Per entry:
- *     entryLength(1) sizeInBlocks(2,BE) flags(2) codeHash(32) fullHash(32) nameLen(1) name(N)
+ * Parse a LIST_APPS response payload into app inventory records.
+ * Wire layout lives in {@link parseAppListPage}; here we keep the full hash
+ * and code size.
  */
 function parseAppListResponse(data: Uint8Array): AppInfo[] {
-  const apps: AppInfo[] = [];
-  let offset = 0;
-
-  // Skip format-version byte
-  if (data.length < 1) return apps;
-  offset += 1;
-
-  // Parse entries by reading fields sequentially — the entryLength field
-  // is informational only. The Ledger DMK ignores it for offset control.
-  while (offset + 69 <= data.length) {
-    offset += 1; // skip entryLength
-
-    const codeLength = (data[offset]! << 8) | data[offset + 1]!; // sizeInBlocks (2B)
-    offset += 2;
-    offset += 2; // skip flags
-
-    const hashBytes = data.subarray(offset + 32, offset + 64); // fullHash
-    const hash = Array.from(hashBytes)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-    offset += 64; // skip codeHash(32) + fullHash(32)
-
-    if (offset >= data.length) break;
-    const nameLen = data[offset]!;
-    offset += 1;
-    if (offset + nameLen > data.length) break;
-
-    // BOLOS names are null-terminated — strip trailing nulls
-    const name = new TextDecoder().decode(data.subarray(offset, offset + nameLen)).replace(/\0+$/g, '');
-    offset += nameLen;
-
-    apps.push({ name, version: '', hash, codeLength });
-  }
-
-  return apps;
+  return parseAppListPage(data).map((entry) => ({
+    name: entry.name,
+    version: '',
+    hash: bytesToHex(entry.fullHash),
+    codeLength: entry.sizeInBlocks,
+  }));
 }
