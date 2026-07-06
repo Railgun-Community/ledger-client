@@ -78,6 +78,7 @@ export async function installApp(
   const primeDelayMs = config.primeDelayMs ?? 250;
   const retryCount = config.retryCount ?? 90;
   const retryDelayMs = config.retryDelayMs ?? 500;
+  const debug = config.debug ?? false;
 
   // Resolve target ID: ELF > explicit > default
   let targetId = config.targetId ?? DEFAULT_TARGET_ID;
@@ -196,8 +197,9 @@ export async function installApp(
       commandApdu = bytes;
     }
 
-    // Log first few APDUs at hex level for debugging
-    if (completedCommands < 3) {
+    // Log first few APDUs at hex level for debugging. Opt-in only: this emits
+    // raw protocol bytes, so it is gated behind config.debug (off by default).
+    if (debug && completedCommands < 3) {
       onProgress?.({
         phase: 'installing',
         completed: completedCommands,
