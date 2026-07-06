@@ -53,7 +53,10 @@ export async function getDeviceInfo(transport: HWTransport): Promise<DeviceInfo>
       'GET_VERSION: version field overflows response',
     );
   }
-  const version = new TextDecoder().decode(data.subarray(5, 5 + versionLen));
+  const version = decodeDeviceString(
+    data.subarray(5, 5 + versionLen),
+    'GET_VERSION version',
+  );
 
   // flags: 4 bytes after version
   const flagsOffset = 5 + versionLen;
@@ -72,8 +75,9 @@ export async function getDeviceInfo(transport: HWTransport): Promise<DeviceInfo>
   if (mcuOffset < data.length) {
     const mcuLen = data[mcuOffset]!;
     if (mcuOffset + 1 + mcuLen <= data.length) {
-      mcuVersion = new TextDecoder().decode(
+      mcuVersion = decodeDeviceString(
         data.subarray(mcuOffset + 1, mcuOffset + 1 + mcuLen),
+        'GET_VERSION mcuVersion',
       );
     }
   }
@@ -109,7 +113,10 @@ export async function getActiveApp(transport: HWTransport): Promise<ActiveAppInf
       'GET_APP_AND_VERSION: name overflows response',
     );
   }
-  const name = new TextDecoder().decode(data.subarray(offset, offset + nameLen));
+  const name = decodeDeviceString(
+    data.subarray(offset, offset + nameLen),
+    'GET_APP_AND_VERSION name',
+  );
   offset += nameLen;
 
   if (name === '' || name === 'BOLOS') {
@@ -121,7 +128,10 @@ export async function getActiveApp(transport: HWTransport): Promise<ActiveAppInf
     const versionLen = data[offset]!;
     offset += 1;
     if (offset + versionLen <= data.length) {
-      version = new TextDecoder().decode(data.subarray(offset, offset + versionLen));
+      version = decodeDeviceString(
+        data.subarray(offset, offset + versionLen),
+        'GET_APP_AND_VERSION version',
+      );
     }
   }
 
@@ -230,6 +240,40 @@ export function isVersionSatisfied(actual: string, required: string): boolean {
 }
 
 // ─── Internal parsers ─────────────────────────────────────────────────────────
+
+/**
+ * Maximum byte length accepted for a device-supplied metadata string
+ * (firmware/app version, active-app name). Real Ledger values are a handful of
+ * ASCII bytes; this cap sits far above any legitimate value while rejecting a
+ * corrupted or hostile device that pads the field toward the 255-byte maximum
+ * a single-byte length prefix allows.
+ */
+const MAX_DEVICE_STRING_BYTES = 64;
+
+/**
+ * Decode a device-supplied metadata string.
+ *
+ * The device is not fully trusted — these bytes come straight off the wire.
+ * A default TextDecoder silently substitutes U+FFFD for malformed UTF-8, which
+ * would mask a corrupt or spoofed response; instead we decode fatally and cap
+ * the length, surfacing anything unexpected as an invalid APDU response.
+ */
+function decodeDeviceString(bytes: Uint8Array, field: string): string {
+  if (bytes.length > MAX_DEVICE_STRING_BYTES) {
+    throw new HWError(
+      HWErrorCode.APDU_INVALID_RESPONSE,
+      `${field} exceeds ${String(MAX_DEVICE_STRING_BYTES)} bytes (${String(bytes.length)})`,
+    );
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new HWError(
+      HWErrorCode.APDU_INVALID_RESPONSE,
+      `${field} is not valid UTF-8`,
+    );
+  }
+}
 
 /**
  * Parse a LIST_APPS response payload.
