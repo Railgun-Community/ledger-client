@@ -69,6 +69,12 @@ export type InstallConfig = {
   readonly retryCount?: number;
   /** Delay between APDU retries in ms. Default: 500. */
   readonly retryDelayMs?: number;
+  /**
+   * Emit verbose install diagnostics through onProgress, including raw APDU
+   * hex for the first few commands. Off by default. This logs raw protocol
+   * bytes, so leave it disabled in production and with sensitive scripts.
+   */
+  readonly debug?: boolean;
 };
 
 // ─── Progress Reporting ─────────────────────────────────────────────────────

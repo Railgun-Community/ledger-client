@@ -10,8 +10,10 @@
  * Requires the Ethereum app to be open on the device.
  *
  * Note: The Ledger SDK apps bundle their own copy of @ledgerhq/hw-transport
- * which may have slightly different type signatures. We use `as never`
- * at the boundary to bridge between our adapter and their expected types.
+ * which may have slightly different optional-property types. Our adapter
+ * extends the top-level @ledgerhq/hw-transport Transport, so a single checked
+ * `as EthAppTransport` bridges to the constructor parameter type the app
+ * expects (no `as unknown` double-cast — TS still verifies structural overlap).
  */
 
 import type { HWTransport } from '../transport/types.js';
@@ -59,7 +61,7 @@ type EthAppTransport = ConstructorParameters<EthAppClass>[0];
  * so we bridge to the exact constructor parameter type the app expects.
  */
 function adaptTransport(transport: HWTransport): EthAppTransport {
-  return createLedgerTransportAdapter(transport) as unknown as EthAppTransport;
+  return createLedgerTransportAdapter(transport) as EthAppTransport;
 }
 
 function normalizeV(value: number | string): number {
