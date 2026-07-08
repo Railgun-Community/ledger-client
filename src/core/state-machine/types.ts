@@ -20,16 +20,13 @@ export type MachineState =
   // Root states
   | 'disconnected'
   | 'connecting'
-  | 'requesting_permission'
   // Connected states
   | 'querying_device'
   | 'device_ready'
   | 'app_check'
   | 'app_missing'
   | 'app_outdated'
-  | 'app_found'
   | 'opening_app'
-  | 'app_ready'
   // Signer states
   | 'signer_idle'
   | 'reviewing'
@@ -38,7 +35,6 @@ export type MachineState =
   | 'sign_rejected'
   // Batch signing states
   | 'batch_reviewing'
-  | 'batch_approved'
   | 'batch_signing_n'
   | 'batch_complete'
   | 'batch_rejected'

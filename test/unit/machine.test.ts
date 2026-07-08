@@ -78,8 +78,8 @@ describe('connection flow', () => {
 // ─── App check flow ───────────────────────────────────────────────────────────
 
 describe('app check flow', () => {
-  it('app_found auto-transitions to opening_app', () => {
-    const result = send('app_found', ctx(), { type: 'CONNECT' }); // any event
+  it('app_check → OPEN_APP_REQUEST → opening_app', () => {
+    const result = send('app_check', ctx(), { type: 'OPEN_APP_REQUEST' });
     expect(result.state).toBe('opening_app');
   });
 
