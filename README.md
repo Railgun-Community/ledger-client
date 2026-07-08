@@ -144,11 +144,15 @@ For RelayAdapt7702, build the EIP-712 digest host-side, sign the 32-byte digest 
 
 This is RAILGUN-app blind/hash EIP-712 signing. The stock Ledger Ethereum app should not be used for the `m/7702'/1984'...` path; current device behavior rejects that custom namespace.
 
-The simplest direct integration is to ask `RailgunSigner` for the engine-compatible signer:
+The simplest direct integration is to build the engine-compatible signer from a
+`RailgunSigner` backend with `createRailgunRelayAdapt7702HookedSignerFromRailgunSigner`:
 
 ```ts
 const railgunSigner = new RailgunSigner({ transport, account: railgunAccountIndex });
-const signer7702 = await railgunSigner.get7702Signer({ chainId, ephemeralIndex });
+const signer7702 = await createRailgunRelayAdapt7702HookedSignerFromRailgunSigner(
+  railgunSigner,
+  { railgunWalletID, railgunAccountIndex, chainId, ephemeralIndex },
+);
 
 // Pass signer7702 anywhere the engine expects its 7702 hooked signer.
 ```
@@ -198,7 +202,7 @@ All public types and functions are re-exported from `src/index.ts`. Key exports:
 | `RailgunSigner`, `EthSigner` | Direct signer access |
 | `RAILGUN_SHIELD_MESSAGE` | Fixed replayable ETH-app ownership marker used by the shield ownership flow |
 | `createEngineLedgerConnector` | Session-aware engine adapter with shield and ETH tx signing hooks |
-| `RailgunSigner.get7702Signer` | Direct engine-compatible 7702 signer from a RAILGUN app signer |
+| `createRailgunRelayAdapt7702HookedSignerFromRailgunSigner` | Build an engine-compatible 7702 signer from a `RailgunSigner` backend |
 | `createRailgun7702SignerProvider` | Engine ephemeral signer provider for 7702 wallet migrations |
 | `installApp` | SCP-based app installer — inject your own root key (experimental) |
 | `generateInstallerKeypair` | Generate an installer root keypair (experimental) |

@@ -43,12 +43,6 @@ import {
   deriveRailgunWalletArtifacts,
   type RailgunWalletArtifacts,
 } from '../wallet-artifacts.js';
-import {
-  createRailgunRelayAdapt7702HookedSignerFromRailgunSigner,
-  type Railgun7702Signer,
-  type Railgun7702SignerRequest,
-  type RailgunRelayAdapt7702SignerOptions,
-} from '../../sdk/engine/railgun-7702-hooked-signer.js';
 
 /**
  * Convert a bigint to a 32-byte little-endian Uint8Array.
@@ -248,22 +242,6 @@ export class RailgunSigner {
       ...this.ethereumAddressFromPublicKey(publicKey),
       capabilities: this.getCapabilities(),
     };
-  }
-
-  async get7702Signer(
-    request: Railgun7702SignerRequest,
-    options: RailgunRelayAdapt7702SignerOptions = {},
-  ): Promise<Railgun7702Signer> {
-    return createRailgunRelayAdapt7702HookedSignerFromRailgunSigner(
-      this,
-      {
-        railgunWalletID: 'railgun-signer',
-        railgunAccountIndex: this.account,
-        chainId: BigInt(request.chainId),
-        ephemeralIndex: request.ephemeralIndex,
-      },
-      options,
-    );
   }
 
   private assertSessionChainId(session: RailgunEthereumSignerSession | undefined, chainId: bigint): void {

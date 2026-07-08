@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RailgunSigner } from '../../src/core/signers/railgun-signer.js';
+import { createRailgunRelayAdapt7702HookedSignerFromRailgunSigner } from '../../src/sdk/engine/railgun-7702-hooked-signer.js';
 import { MockTransport } from '../integration/mock-transport.js';
 import { successResponse, errorResponse } from '../fixtures/apdu-responses.js';
 import { StatusWord } from '../../src/core/transport/types.js';
@@ -206,7 +207,7 @@ describe('RailgunSigner', () => {
       expect(Buffer.from(transport.sentCommands[0]?.data ?? new Uint8Array()).toString('hex')).toBe('000000020000a4b100000007');
     });
 
-    it('gets an engine-compatible 7702 signer from RailgunSigner', async () => {
+    it('builds an engine-compatible 7702 signer from a RailgunSigner backend', async () => {
       signer = new RailgunSigner({ transport, account: 2 });
       const publicKey = new Uint8Array(Buffer.from(
         '0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
@@ -216,10 +217,15 @@ describe('RailgunSigner', () => {
       transport.enqueueResponse(successResponse(publicKey));
       transport.enqueueResponse(ethereumSignatureResponse(1));
 
-      const railgun7702Signer = await signer.get7702Signer({
-        chainId: '42161',
-        ephemeralIndex: 7,
-      });
+      const railgun7702Signer = await createRailgunRelayAdapt7702HookedSignerFromRailgunSigner(
+        signer,
+        {
+          railgunWalletID: 'railgun-signer',
+          railgunAccountIndex: 2,
+          chainId: 42161n,
+          ephemeralIndex: 7,
+        },
+      );
       const authorization = await railgun7702Signer.authorize({
         address: '0x1111111111111111111111111111111111111111',
         chainId: 42161n,

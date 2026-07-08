@@ -52,7 +52,11 @@ advertised capabilities and throw `APP_VERSION_MISMATCH` if unsupported.
 | `prepareEthereumSigner(request)` | Preload/derive the EOA for a `{ railgunAccountIndex, chainId, ephemeralIndex }` session (binds later signatures to the same path). |
 | `signEip7702Authorization(request)` | Sign an EIP-7702 authorization (`INS 0x08`). |
 | `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (clear signing). |
-| `get7702Signer(request, options?)` | Return an engine-compatible RelayAdapt7702 hooked signer. |
+
+To build an engine-compatible RelayAdapt7702 hooked signer from a `RailgunSigner`
+backend, use the exported `createRailgunRelayAdapt7702HookedSignerFromRailgunSigner`
+(SDK layer) rather than a signer method — this keeps the core signer free of any
+dependency on the engine/SDK layer.
 
 **Guidance:** prefer `display: true` (clear signing) so the device shows context; treat
 blind/hash-only signing (`display: false`) as an explicit, audited opt-in. For RAILGUN
