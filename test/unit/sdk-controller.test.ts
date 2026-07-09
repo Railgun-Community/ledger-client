@@ -149,15 +149,15 @@ describe('createLedgerController', () => {
     transport.enqueueResponse(successResponse(buildSignResponse(0n, 1n, 7n)));
 
     const signPromise = controller.sign(12345n);
-    await waitForState(() => controller.getSnapshot().machineState, 'reviewing');
+    await waitForState(() => controller.getSnapshot().action, 'reviewing_sign');
 
     const reviewing = controller.getSnapshot();
-    expect(reviewing.machineState).toBe('reviewing');
+    expect(reviewing.action).toBe('reviewing_sign');
     expect(reviewing.modal.kind).toBe('review_sign');
 
     expect(controller.approveCurrentAction()).toBe(true);
     const confirming = controller.getSnapshot();
-    expect(confirming.machineState).toBe('confirming');
+    expect(confirming.action).toBe('awaiting_device_confirmation');
     expect(confirming.modal).toEqual({
       kind: 'signing_progress',
       step: 'awaiting_device',
@@ -169,7 +169,8 @@ describe('createLedgerController', () => {
     expect(signature.R8[0]).toBe(0n);
     expect(signature.R8[1]).toBe(1n);
     expect(signature.S).toBe(7n);
-    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+    expect(controller.getSnapshot().readiness).toBe('ready');
+    expect(controller.getSnapshot().action).toBe('idle');
   });
 
   it('approve then a stray reject: the reject is a no-op and the signature still completes', async () => {
@@ -179,7 +180,7 @@ describe('createLedgerController', () => {
     transport.enqueueResponse(successResponse(buildSignResponse(0n, 1n, 7n)));
 
     const signPromise = controller.sign(12345n);
-    await waitForState(() => controller.getSnapshot().machineState, 'reviewing');
+    await waitForState(() => controller.getSnapshot().action, 'reviewing_sign');
 
     expect(controller.approveCurrentAction()).toBe(true);
     // A stray reject after approve must not settle the already-approved action.
@@ -187,7 +188,8 @@ describe('createLedgerController', () => {
 
     const signature = await signPromise;
     expect(signature.S).toBe(7n);
-    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+    expect(controller.getSnapshot().readiness).toBe('ready');
+    expect(controller.getSnapshot().action).toBe('idle');
   });
 
   it('creates a batch approval session after explicit approval', async () => {
@@ -207,10 +209,10 @@ describe('createLedgerController', () => {
         },
       },
     ]);
-    await waitForState(() => controller.getSnapshot().machineState, 'batch_reviewing');
+    await waitForState(() => controller.getSnapshot().action, 'reviewing_batch');
 
     const reviewing = controller.getSnapshot();
-    expect(reviewing.machineState).toBe('batch_reviewing');
+    expect(reviewing.action).toBe('reviewing_batch');
     expect(reviewing.modal.kind).toBe('review_batch');
 
     expect(controller.approveCurrentAction()).toBe(true);
@@ -219,7 +221,7 @@ describe('createLedgerController', () => {
     expect(session.approved).toBe(true);
     expect(session.subSession.length).toBeGreaterThan(0);
     expect(controller.getSnapshot().approvalSession?.subSession).toBe(session.subSession);
-    expect(controller.getSnapshot().machineState).toBe('batch_signing_n');
+    expect(controller.getSnapshot().action).toBe('batch_signing');
   });
 
   it('a stray reject during batch signing is a no-op and preserves the approval session', async () => {
@@ -239,14 +241,14 @@ describe('createLedgerController', () => {
         },
       },
     ]);
-    await waitForState(() => controller.getSnapshot().machineState, 'batch_reviewing');
+    await waitForState(() => controller.getSnapshot().action, 'reviewing_batch');
     expect(controller.approveCurrentAction()).toBe(true);
     const session = await approvalPromise;
 
     // A stray reject once signing has started must not tear down the session.
     expect(controller.rejectCurrentAction(new Error('stray'))).toBe(false);
     expect(controller.getSnapshot().approvalSession?.subSession).toBe(session.subSession);
-    expect(controller.getSnapshot().machineState).toBe('batch_signing_n');
+    expect(controller.getSnapshot().action).toBe('batch_signing');
   });
 
   it('rejects a batch sign that omits publicInputs (item cannot be verified against the approved set)', async () => {
@@ -266,7 +268,7 @@ describe('createLedgerController', () => {
         },
       },
     ]);
-    await waitForState(() => controller.getSnapshot().machineState, 'batch_reviewing');
+    await waitForState(() => controller.getSnapshot().action, 'reviewing_batch');
     expect(controller.approveCurrentAction()).toBe(true);
     const session = await approvalPromise;
 
@@ -283,12 +285,13 @@ describe('createLedgerController', () => {
     transport.enqueueResponse(successResponse(buildAppVersionResponse('RAILGUN', '0.1.0')));
 
     const signPromise = controller.sign(12345n);
-    await waitForState(() => controller.getSnapshot().machineState, 'reviewing');
+    await waitForState(() => controller.getSnapshot().action, 'reviewing_sign');
 
     expect(controller.rejectCurrentAction(new Error('User closed modal'))).toBe(true);
 
     await expect(signPromise).rejects.toThrow('User closed modal');
-    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+    expect(controller.getSnapshot().readiness).toBe('ready');
+    expect(controller.getSnapshot().action).toBe('idle');
   });
 
   it('returns false when approve/reject are called without a pending action', async () => {
@@ -322,7 +325,8 @@ describe('createLedgerController', () => {
     expect(result.derivationPath).toBe("m/44'/60'/0'/0/4");
     expect(controller.getSnapshot().deviceSession?.activeApp?.name).toBe('Ethereum');
     expect(controller.getSnapshot().requiredApp?.name).toBe('Ethereum');
-    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+    expect(controller.getSnapshot().readiness).toBe('ready');
+    expect(controller.getSnapshot().action).toBe('idle');
   });
 
   it('opens the Ethereum app for custom-path address reads', async () => {
@@ -364,7 +368,8 @@ describe('createLedgerController', () => {
       derivationPath: "m/7702'/1984'/2'/42161/7",
     });
     expect(result.type).toBe('eth');
-    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+    expect(controller.getSnapshot().readiness).toBe('ready');
+    expect(controller.getSnapshot().action).toBe('idle');
   });
 
   it('rejects malformed custom Ethereum paths before opening the app', async () => {
@@ -439,9 +444,9 @@ describe('createLedgerController', () => {
 
   it('surfaces openApp cancellation instead of hanging in opening_app', async () => {
     const controller = createController();
-    const states: string[] = [];
+    const readinessSequence: string[] = [];
     const unsubscribe = controller.subscribe((snapshot) => {
-      states.push(snapshot.machineState);
+      readinessSequence.push(snapshot.readiness);
     });
 
     await controller.connect();
@@ -453,8 +458,11 @@ describe('createLedgerController', () => {
     });
     unsubscribe();
 
-    expect(states).toContain('opening_app');
-    expect(controller.getSnapshot().machineState).toBe('error.user_rejected');
+    // The controller must pass through opening_app (not skip straight to error),
+    // then settle into an error readiness once the device rejects the app open.
+    expect(readinessSequence).toContain('opening_app');
+    expect(readinessSequence.at(-1)).toBe('error');
+    expect(controller.getSnapshot().readiness).toBe('error');
     expect(controller.getSnapshot().error?.code).toBe(HWErrorCode.SIGN_REJECTED_DEVICE);
   });
 
@@ -484,7 +492,8 @@ describe('createLedgerController', () => {
     await expect(controller.openApp('Ethereum')).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_TIMEOUT,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.timeout');
+    expect(controller.getSnapshot().readiness).toBe('error');
+    expect(controller.getSnapshot().error?.code).toBe(HWErrorCode.TRANSPORT_TIMEOUT);
   });
 
   it('normalizes plain app-open failures during ensureReady', async () => {
@@ -519,7 +528,8 @@ describe('createLedgerController', () => {
     await expect(controller.ensureReady()).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_TIMEOUT,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.timeout');
+    expect(controller.getSnapshot().readiness).toBe('error');
+    expect(controller.getSnapshot().error?.code).toBe(HWErrorCode.TRANSPORT_TIMEOUT);
   });
 
   it('normalizes plain transport timeout errors during app open', async () => {
@@ -548,7 +558,8 @@ describe('createLedgerController', () => {
     await expect(controller.openApp('Ethereum')).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_TIMEOUT,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.timeout');
+    expect(controller.getSnapshot().readiness).toBe('error');
+    expect(controller.getSnapshot().error?.code).toBe(HWErrorCode.TRANSPORT_TIMEOUT);
   });
 
   it('classifies app-open disconnect as error.transport_lost', async () => {
@@ -577,7 +588,7 @@ describe('createLedgerController', () => {
     await expect(controller.openApp('Ethereum')).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_DISCONNECTED,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.transport_lost');
+    expect(controller.getSnapshot().modal.kind).toBe('transport_disconnected');
   });
 
   it('classifies post-open verification disconnect during ensureReady as error.transport_lost', async () => {
@@ -615,7 +626,7 @@ describe('createLedgerController', () => {
     await expect(controller.ensureReady()).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_DISCONNECTED,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.transport_lost');
+    expect(controller.getSnapshot().modal.kind).toBe('transport_disconnected');
   });
 
   it('rejects openApp when the requested app is not active after a success status', async () => {
@@ -630,7 +641,8 @@ describe('createLedgerController', () => {
     await expect(controller.openApp('Ethereum')).rejects.toMatchObject({
       code: HWErrorCode.APP_OPEN_FAILED,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.app_error');
+    expect(controller.getSnapshot().readiness).toBe('error');
+    expect(controller.getSnapshot().error?.code).toBe(HWErrorCode.APP_OPEN_FAILED);
   });
 
   it('classifies shield-marker transport disconnect as error.transport_lost', async () => {
@@ -644,7 +656,7 @@ describe('createLedgerController', () => {
     await expect(controller.signShieldOwnershipMarker(0)).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_DISCONNECTED,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.transport_lost');
+    expect(controller.getSnapshot().modal.kind).toBe('transport_disconnected');
   });
 
   it('classifies plain shield-marker disconnect errors as error.transport_lost', async () => {
@@ -658,7 +670,7 @@ describe('createLedgerController', () => {
     await expect(controller.signShieldOwnershipMarker(0)).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_DISCONNECTED,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.transport_lost');
+    expect(controller.getSnapshot().modal.kind).toBe('transport_disconnected');
   });
 
   it('returns to signer_idle after shield-marker rejection', async () => {
@@ -672,7 +684,8 @@ describe('createLedgerController', () => {
     await expect(controller.signShieldOwnershipMarker(0)).rejects.toMatchObject({
       code: HWErrorCode.SIGN_REJECTED_DEVICE,
     });
-    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+    expect(controller.getSnapshot().readiness).toBe('ready');
+    expect(controller.getSnapshot().action).toBe('idle');
   });
 
   it('classifies ETH transaction transport disconnect as error.transport_lost', async () => {
@@ -686,7 +699,7 @@ describe('createLedgerController', () => {
     await expect(controller.signEthTransaction('00', 0)).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_DISCONNECTED,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.transport_lost');
+    expect(controller.getSnapshot().modal.kind).toBe('transport_disconnected');
   });
 
   it('classifies plain ETH transaction disconnect errors as error.transport_lost', async () => {
@@ -700,7 +713,7 @@ describe('createLedgerController', () => {
     await expect(controller.signEthTransaction('00', 0)).rejects.toMatchObject({
       code: HWErrorCode.TRANSPORT_DISCONNECTED,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.transport_lost');
+    expect(controller.getSnapshot().modal.kind).toBe('transport_disconnected');
   });
 
   it('returns to signer_idle after ETH transaction rejection', async () => {
@@ -714,7 +727,8 @@ describe('createLedgerController', () => {
     await expect(controller.signEthTransaction('00', 0)).rejects.toMatchObject({
       code: HWErrorCode.SIGN_REJECTED_DEVICE,
     });
-    expect(controller.getSnapshot().machineState).toBe('signer_idle');
+    expect(controller.getSnapshot().readiness).toBe('ready');
+    expect(controller.getSnapshot().action).toBe('idle');
   });
 
   it('classifies generic ETH signer failures as protocol errors instead of app-open failures', async () => {
@@ -728,7 +742,8 @@ describe('createLedgerController', () => {
     await expect(controller.signEthTransaction('00', 0)).rejects.toMatchObject({
       code: HWErrorCode.APDU_STATUS_ERROR,
     });
-    expect(controller.getSnapshot().machineState).toBe('error.protocol_error');
+    expect(controller.getSnapshot().readiness).toBe('error');
+    expect(controller.getSnapshot().error?.code).toBe(HWErrorCode.APDU_STATUS_ERROR);
   });
 
   it('rejects invalid ownership-marker indexes before switching apps', async () => {
@@ -792,7 +807,7 @@ describe('createLedgerController', () => {
     controller.clearError();
     await Promise.resolve();
 
-    expect(controller.getSnapshot().machineState).toBe('disconnected');
+    expect(controller.getSnapshot().readiness).toBe('disconnected');
     expect(controller.getSnapshot().error).toBeNull();
     expect(controller.getSnapshot().deviceSession).toBeNull();
     expect(transportFactory).toHaveBeenCalledTimes(1);
@@ -867,7 +882,7 @@ describe('createLedgerController', () => {
     await controller.connect();
     transport.simulateDisconnect();
 
-    expect(controller.getSnapshot().machineState).toBe('error.transport_lost');
+    expect(controller.getSnapshot().modal.kind).toBe('transport_disconnected');
     expect(onDisconnect).toHaveBeenCalledTimes(1);
 
     controller.clearError();
@@ -904,7 +919,7 @@ describe('createLedgerController', () => {
     enqueueReadyResponses();
 
     const signPromise = controller.sign(12345n);
-    await waitForState(() => controller.getSnapshot().machineState, 'reviewing');
+    await waitForState(() => controller.getSnapshot().action, 'reviewing_sign');
 
     const disposePromise = controller.dispose();
 
@@ -914,7 +929,9 @@ describe('createLedgerController', () => {
     });
     await disposePromise;
 
-    expect(controller.getSnapshot().machineState).toBe('disposed');
+    // The public contract collapses `disposed` onto the error readiness; there is
+    // no disposed-specific external signal (see machine.test.ts for FSM-level state).
+    expect(controller.getSnapshot().readiness).toBe('error');
   });
 
   it('disconnect still publishes a disconnected snapshot if transport disconnect fails', async () => {
@@ -940,7 +957,7 @@ describe('createLedgerController', () => {
     await controller.connect();
     await expect(controller.disconnect()).rejects.toThrow('disconnect failed');
 
-    expect(controller.getSnapshot().machineState).toBe('disconnected');
+    expect(controller.getSnapshot().readiness).toBe('disconnected');
     expect(controller.getSnapshot().deviceSession).toBeNull();
   });
 
@@ -967,7 +984,9 @@ describe('createLedgerController', () => {
     await controller.connect();
     await expect(controller.dispose()).rejects.toThrow('dispose disconnect failed');
 
-    expect(controller.getSnapshot().machineState).toBe('disposed');
+    // `disposed` is collapsed onto the error readiness in the public contract; the
+    // disposed-specific FSM state is covered separately in machine.test.ts.
+    expect(controller.getSnapshot().readiness).toBe('error');
     expect(controller.getSnapshot().deviceSession).toBeNull();
   });
 });
