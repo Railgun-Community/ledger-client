@@ -106,13 +106,11 @@ export type {
 export { CAPABILITY_STATUS } from './core/capabilities.js';
 export type { CapabilityStatus } from './core/capabilities.js';
 
-export type {
-  MachineState,
-  MachineEvent,
-  MachineMode,
-  MachineContext,
-  TransitionResult,
-} from './core/state-machine/types.js';
+// MachineMode is part of the snapshot contract (LedgerControllerSnapshot.mode). The rest of
+// the state-machine types (MachineState/MachineEvent/MachineContext/TransitionResult) are
+// internal — consumers drive the flow through the LedgerController snapshot
+// (readiness/action/modal), not the raw FSM types.
+export type { MachineMode } from './core/state-machine/types.js';
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 export { HWError, HWErrorCode } from './core/errors.js';
