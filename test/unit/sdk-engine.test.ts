@@ -93,7 +93,6 @@ function createController(): LedgerController {
     getConnector: vi.fn(() => null),
     getSnapshot: vi.fn(() => ({
       mode: 'signer',
-      machineState: 'signer_idle',
       readiness: 'ready',
       action: 'idle',
       isBusy: false,

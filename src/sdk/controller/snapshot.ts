@@ -5,7 +5,7 @@ import type {
   DeviceInfo,
 } from '../../core/device/types.js';
 import type { HWError } from '../../core/errors.js';
-import type { MachineMode, MachineState } from '../../core/state-machine/types.js';
+import type { MachineMode } from '../../core/state-machine/types.js';
 import type { LedgerModalIntent } from './modal-intents.js';
 
 export type LedgerControllerReadiness =
@@ -48,7 +48,6 @@ export type LedgerApprovalSessionSummary = {
 
 export type LedgerControllerSnapshot = {
   readonly mode: MachineMode;
-  readonly machineState: MachineState;
   readonly readiness: LedgerControllerReadiness;
   readonly action: LedgerControllerAction;
   readonly isBusy: boolean;

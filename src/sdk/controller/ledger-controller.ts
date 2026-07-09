@@ -805,7 +805,6 @@ export function createLedgerController(
   function getSnapshot(): LedgerControllerSnapshot {
     return {
       mode: context.mode,
-      machineState: state,
       readiness: mapReadiness(state),
       action: mapAction(state),
       isBusy: state !== 'signer_idle' && state !== 'disconnected',

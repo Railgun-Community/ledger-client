@@ -121,7 +121,6 @@ This is the main read model for external consumers.
 ## Snapshot Shape
 
 Important fields:
-- `machineState`
 - `readiness`
 - `action`
 - `isBusy`
