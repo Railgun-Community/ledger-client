@@ -171,7 +171,6 @@ export function transition(
       return handleDisconnected(ctx, event);
 
     case 'connecting':
-    case 'requesting_permission':
       return handleConnecting(state, ctx, event);
 
     case 'querying_device':
@@ -187,13 +186,9 @@ export function transition(
     case 'app_outdated':
       return handleAppOutdated(ctx, event);
 
-    case 'app_found':
-      return handleAppFound(ctx, event);
-
     case 'opening_app':
       return handleOpeningApp(ctx, event);
 
-    case 'app_ready':
     case 'signer_idle':
       return handleSignerIdle(state, ctx, event);
 
@@ -213,7 +208,6 @@ export function transition(
     case 'batch_reviewing':
       return handleBatchReviewing(ctx, event);
 
-    case 'batch_approved':
     case 'batch_signing_n':
       return handleBatchSigningN(ctx, event);
 
@@ -409,15 +403,6 @@ function handleAppOutdated(
     return { state: 'device_ready', context: ctx };
   }
   return { state: 'app_outdated', context: ctx };
-}
-
-function handleAppFound(
-  _ctx: MachineContext,
-  _event: MachineEvent,
-): TransitionResult {
-  // app_found auto-transitions to opening_app — handled by the caller
-  // If we get here, treat any event as moving forward
-  return { state: 'opening_app', context: _ctx };
 }
 
 function handleOpeningApp(

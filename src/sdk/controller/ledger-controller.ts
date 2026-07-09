@@ -644,15 +644,12 @@ export function createLedgerController(
       case 'disconnected':
         return 'disconnected';
       case 'connecting':
-      case 'requesting_permission':
         return 'connecting';
       case 'querying_device':
         return 'querying_device';
       case 'device_ready':
         return 'device_ready';
       case 'app_check':
-      case 'app_found':
-      case 'app_ready':
         return 'app_check';
       case 'app_missing':
         return 'app_missing';
@@ -712,7 +709,7 @@ export function createLedgerController(
     if (state === 'disconnected') {
       return { kind: 'connect_hardware' };
     }
-    if (state === 'connecting' || state === 'requesting_permission') {
+    if (state === 'connecting') {
       return { kind: 'request_browser_permission' };
     }
     if (state === 'opening_app' && requirement !== null) {

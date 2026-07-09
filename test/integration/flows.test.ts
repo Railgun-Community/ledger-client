@@ -110,9 +110,8 @@ describe('full connection → sign flow (state machine)', () => {
     expect(m.state).toBe('app_check');
     expect(m.context.installedApps).toHaveLength(2);
 
-    // Manually move to app_found (caller determines app exists)
-    m = { ...m, state: 'app_found' };
-    m = step(m, { type: 'CONNECT' }); // trigger auto-transition
+    // Open the required app (app_check → opening_app)
+    m = step(m, { type: 'OPEN_APP_REQUEST' });
     expect(m.state).toBe('opening_app');
 
     // App opened
