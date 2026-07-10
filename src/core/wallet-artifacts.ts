@@ -65,8 +65,12 @@ function encodeEngineShareableViewingKeyPayload(
 }
 
 async function packEngineSpendingPublicKey(spendingPublicKey: SpendingPublicKey): Promise<string> {
-  const circom = await import('@railgun-community/circomlibjs') as unknown as CircomBabyJubModule;
-  const packed = circom.babyjub.packPoint([spendingPublicKey.x, spendingPublicKey.y]);
+  // circomlibjs lands its exports on `.default` under ESM/bundlers (browser) but
+  // directly on the namespace under CJS — mirror the poseidon access below.
+  const circom = await import('@railgun-community/circomlibjs') as unknown as
+    CircomBabyJubModule & { default?: CircomBabyJubModule };
+  const babyjub = circom.default?.babyjub ?? circom.babyjub;
+  const packed = babyjub.packPoint([spendingPublicKey.x, spendingPublicKey.y]);
   return bytesToHex(Uint8Array.from(packed));
 }
 
