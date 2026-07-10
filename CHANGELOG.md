@@ -3,10 +3,18 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
-## Unreleased
+## 0.2.0 — 2026-07-10
 
 ### Breaking
 
+- **`LedgerControllerSnapshot` no longer has `machineState`.** The controller snapshot is the
+  stable consumption contract — render device/flow state from `readiness` / `action` / `modal`
+  (and `error`), not the raw finite-state-machine state.
+- **The raw state-machine types are no longer exported** (`MachineState`, `MachineEvent`,
+  `MachineContext`, `TransitionResult`) — they are internal. `MachineMode` and the
+  `transition` / `createInitialContext` / guard value exports remain.
+- Removed four unreachable `MachineState` values (`app_ready`, `requesting_permission`,
+  `batch_approved`, `app_found`) — the reducer never produced them.
 - **No installer root key is bundled anymore.** Removed the built-in `getRootKey` export
   and the `KeyEnvironment` type / `InstallConfig.keyEnvironment` field. `installApp` now
   **requires** an injected `rootPrivateKey` for SCP installs and throws a clear error if
@@ -36,6 +44,12 @@ project is pre-1.0 and experimental; expect breaking changes on minor versions.
 - Marked status across the surface: the installer and key-attestation APIs are
   `experimental`, FROST/MPC builders are `unsupported` on current firmware, and the
   EIP-7702 signing surface is `under-development` (JSDoc/notice comments + docs).
+
+### Fixed
+
+- `getWalletArtifacts` / `deriveRailgunWalletArtifacts` crashed under browser bundles
+  ("Cannot read properties of undefined (reading 'packPoint')") — circomlibjs `babyjub` is
+  exported under `.default` in ESM; now accessed via the same `.default` fallback as `poseidon`.
 
 ## Migration
 
