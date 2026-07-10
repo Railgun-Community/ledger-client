@@ -23,10 +23,16 @@ export function createTransport(config?: TransportConfig): HWTransport {
     case 'webhid':
       return new WebHIDTransport(config);
 
+    case 'nodehid':
+      throw new HWError(
+        HWErrorCode.TRANSPORT_NOT_AVAILABLE,
+        'Node HID transport is Node-only and not constructed by the browser factory. Import NodeHIDTransport directly in a Node context, or inject it via the controller transportFactory option.',
+      );
+
     case 'ble':
       throw new HWError(
         HWErrorCode.TRANSPORT_NOT_AVAILABLE,
-        'BLE transport is not yet implemented.',
+        "BLE transport is not built into createTransport. Provide one via the controller's transportFactory option (see docs/api/transport.md).",
       );
 
     default: {

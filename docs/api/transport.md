@@ -8,7 +8,7 @@ WebHID in the browser, Node HID in scripts, or a mock in tests.
 
 ```ts
 interface HWTransport {
-  readonly type: TransportType;              // 'webhid' | 'ble'
+  readonly type: TransportType;              // 'webhid' | 'nodehid' | 'ble'
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   send(command: ApduCommand): Promise<ApduResponse>;   // structured APDU
@@ -37,9 +37,11 @@ const transport = await createTransport({ type: 'webhid' }); // or: new WebHIDTr
 await transport.connect(); // prompts the user to pick their Ledger (requires a user gesture)
 ```
 
-`createTransport(config?: TransportConfig)` is the factory; `TransportConfig` is
-`{ type: 'webhid' | 'ble'; timeout?: number }` (default timeout 30000ms). Only `'webhid'` is
-implemented today — `'ble'` throws.
+`createTransport(config?: TransportConfig)` is the browser factory; `TransportConfig` is
+`{ type: 'webhid' | 'nodehid' | 'ble'; timeout?: number }` (default timeout 30000ms). It builds
+`'webhid'`; `'nodehid'` and `'ble'` throw a directional `HWError` — Node HID is Node-only (import
+`NodeHIDTransport` directly, see below), and BLE is not bundled (inject your own via the controller's
+`transportFactory`, see [Choosing / injecting a transport](#choosing--injecting-a-transport)).
 
 **Browser requirements for WebHID:**
 - a **secure context** (HTTPS or `localhost`)
@@ -59,6 +61,11 @@ rather than touching real hardware.
   `createLedgerController(...)` — the controller owns `connect`/`disconnect`.
 - With a **direct signer**: create and connect the transport yourself, then pass it to
   `new RailgunSigner({ transport })` / `new EthSigner({ transport })`.
+- **Adding a transport (e.g. BLE):** `createTransport` intentionally bundles only WebHID (no extra
+  runtime deps). To use BLE or any other channel, implement the `HWTransport` interface — e.g. a thin
+  wrapper over `@ledgerhq/hw-transport-web-ble` (see `WebHIDTransport` for reference) — and inject it via
+  `transportFactory: () => new MyBleTransport()`. No core change is needed; `isBLEAvailable()` is the
+  environment-capability probe (symmetric with `isWebHIDAvailable()`).
 
 ## Errors
 

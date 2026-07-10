@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isWebHIDAvailable,
+  isBLEAvailable,
   hasTransport,
   isAppInstalled,
   isAppVersionSatisfied,
@@ -30,6 +31,12 @@ describe('guards', () => {
   describe('isWebHIDAvailable', () => {
     it('returns false in Node (no navigator)', () => {
       expect(isWebHIDAvailable()).toBe(false);
+    });
+  });
+
+  describe('isBLEAvailable', () => {
+    it('returns false in Node (no navigator)', () => {
+      expect(isBLEAvailable()).toBe(false);
     });
   });
 

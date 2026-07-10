@@ -23,7 +23,7 @@ async function importNodeHIDTransport(): Promise<typeof import('@ledgerhq/hw-tra
 }
 
 export class NodeHIDTransport implements HWTransport {
-  readonly type = 'webhid' as const; // Treated as same transport type for FSM compatibility
+  readonly type = 'nodehid' as const;
 
   private _transport: import('@ledgerhq/hw-transport').default | null = null;
   private _disconnectCallbacks: Array<() => void> = [];

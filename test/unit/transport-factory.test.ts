@@ -19,7 +19,13 @@ describe('createTransport', () => {
     expect(transport).toBeInstanceOf(WebHIDTransport);
   });
 
-  it('throws for BLE (not implemented)', () => {
+  it('throws for BLE with a message pointing at transportFactory injection', () => {
     expect(() => createTransport({ type: 'ble' })).toThrow(HWError);
+    expect(() => createTransport({ type: 'ble' })).toThrow(/transportFactory/);
+  });
+
+  it('throws for nodehid, directing to direct import or transportFactory', () => {
+    expect(() => createTransport({ type: 'nodehid' })).toThrow(HWError);
+    expect(() => createTransport({ type: 'nodehid' })).toThrow(/Node HID|transportFactory/);
   });
 });

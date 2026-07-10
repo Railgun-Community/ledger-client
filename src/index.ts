@@ -323,6 +323,7 @@ export { createLedgerTransportAdapter } from './core/transport/ledger-transport-
 export { transition, createInitialContext } from './core/state-machine/machine.js';
 export {
   isWebHIDAvailable,
+  isBLEAvailable,
   hasTransport,
   isAppInstalled,
   isAppVersionSatisfied,

@@ -20,7 +20,7 @@ Use it when you need:
 
 ```ts
 type LedgerController = {
-  connect(options?: { transportType?: 'webhid' | 'ble' }): Promise<void>;
+  connect(options?: { transportType?: 'webhid' | 'nodehid' | 'ble' }): Promise<void>;
   disconnect(): Promise<void>;
   ensureReady(options?: { requiredApp?: AppRequirement }): Promise<void>;
   getPublicKey(): Promise<{ x: bigint; y: bigint }>;
@@ -159,7 +159,7 @@ Important fields:
 ```ts
 type LedgerControllerOptions = {
   requiredApps?: readonly AppRequirement[];
-  defaultTransportType?: 'webhid' | 'ble';
+  defaultTransportType?: 'webhid' | 'nodehid' | 'ble';
   approvalTimeoutMs?: number;
   transportFactory?: (transportType: TransportType) => HWTransport;
   onError?: (error: HWError) => void;
