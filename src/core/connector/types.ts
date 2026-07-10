@@ -1,4 +1,5 @@
 import type { ApduProfile } from '../transport/apdu-profile.js';
+import type { Assert, Equals, Resolve } from '../internal/type-assert.js';
 
 /**
  * RAILGUN engine-facing connector types.
@@ -66,20 +67,15 @@ export type LedgerConnectorConfig = {
 };
 
 /**
- * Hardware connector interface — injected into engine's HardwareWallet.
- * Follows the WakuConnector pattern.
+ * Fields shared by every Ledger connector shape — the minimal engine-facing
+ * connector (WakuConnector pattern). The sdk connector types build on this too.
  */
-export type HardwareConnector = {
+export type CommonConnectorBase = {
   readonly type: 'ledger';
   readonly deviceId: string;
 
   /** Sign a poseidon hash, returning a BabyJubjub EdDSA signature. */
   sign: HardwareConnectorSignFn;
-
-  /** Request batch approval before signing multiple transactions. */
-  requestBatchApproval: (
-    requests: readonly RequestApprovalOptions[],
-  ) => Promise<boolean>;
 
   /** Get the BabyJubjub public key from the device. */
   getPublicKey: () => Promise<{ readonly x: bigint; readonly y: bigint }>;
@@ -90,3 +86,38 @@ export type HardwareConnector = {
   /** Disconnect the transport and release resources. */
   disconnect: () => Promise<void>;
 };
+
+/**
+ * Hardware connector interface — injected into engine's HardwareWallet.
+ * Follows the WakuConnector pattern.
+ */
+export type HardwareConnector = CommonConnectorBase & {
+  /** Request batch approval before signing multiple transactions. */
+  requestBatchApproval: (
+    requests: readonly RequestApprovalOptions[],
+  ) => Promise<boolean>;
+};
+
+/* ── compile-time structural-identity lock (internal; not exported) ────────────
+ * Freezes the RESOLVED public shape of HardwareConnector so a future refactor
+ * cannot silently change what consumers depend on. Enforced by `yarn typecheck`
+ * (tsc over src/). `Equals` is stricter than mutual `extends`: it distinguishes
+ * optional-vs-required and readonly differences. A drift makes `Assert<false>`
+ * fail its `extends true` constraint at this declaration. A deliberate public
+ * shape change must update the reference below — that is intentional and loud.
+ * Equals/Assert/Resolve come from ../internal/type-assert.js. */
+
+type HardwareConnector_Reference = {
+  readonly type: 'ledger';
+  readonly deviceId: string;
+  sign: HardwareConnectorSignFn;
+  requestBatchApproval: (
+    requests: readonly RequestApprovalOptions[],
+  ) => Promise<boolean>;
+  getPublicKey: () => Promise<{ readonly x: bigint; readonly y: bigint }>;
+  isConnected: () => boolean;
+  disconnect: () => Promise<void>;
+};
+type _LockHardwareConnector = Assert<
+  Equals<Resolve<HardwareConnector>, HardwareConnector_Reference>
+>;
