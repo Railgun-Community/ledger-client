@@ -1,6 +1,7 @@
 node_modules/
 dist/
 *.tsbuildinfo
+*.tgz
 .DS_Store
 .certs/
 src/core/installer/bundled-artifacts.generated.ts

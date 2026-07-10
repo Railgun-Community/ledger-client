@@ -9,6 +9,7 @@
 import type { HWTransport, TransportConfig } from './types.js';
 import { HWError, HWErrorCode } from '../errors.js';
 import { WebHIDTransport } from './webhid-transport.js';
+import { WebBLETransport } from './web-ble-transport.js';
 
 /**
  * Create an HWTransport instance based on configuration.
@@ -30,10 +31,7 @@ export function createTransport(config?: TransportConfig): HWTransport {
       );
 
     case 'ble':
-      throw new HWError(
-        HWErrorCode.TRANSPORT_NOT_AVAILABLE,
-        "BLE transport is not built into createTransport. Provide one via the controller's transportFactory option (see docs/api/transport.md).",
-      );
+      return new WebBLETransport(config);
 
     default: {
       const _exhaustive: never = type;
