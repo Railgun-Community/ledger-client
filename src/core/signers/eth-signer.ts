@@ -161,7 +161,10 @@ export class EthSigner {
     const result = await eth.signTransaction(
       request.derivationPath,
       request.rawTxHex,
-      null, // blind signing — no resolution
+      // Non-blind: an empty clear-signing resolution makes the ETH app parse and
+      // display the transaction for on-device review instead of requiring device
+      // "blind signing". Empty arrays = no external (network) token/NFT/domain enrichment.
+      { erc20Tokens: [], nfts: [], externalPlugin: [], plugin: [], domains: [] },
     );
 
     return {
