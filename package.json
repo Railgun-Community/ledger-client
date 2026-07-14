@@ -1,6 +1,6 @@
 {
   "name": "@railgun-community/ledger-client",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "RAILGUN hardware wallet connector — Ledger-first, state-machine-driven TSX component",
   "type": "module",
   "main": "dist/index.js",
