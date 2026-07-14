@@ -47,21 +47,21 @@ GitHub, pinned to a release tag — see
 script runs the build):
 
 ```bash
-yarn add github:Railgun-Community/ledger-client#v0.2.0
+yarn add github:Railgun-Community/ledger-client#v0.2.1
 ```
 
 or in `package.json`:
 
 ```jsonc
 "dependencies": {
-  "@railgun-community/ledger-client": "github:Railgun-Community/ledger-client#v0.2.0"
+  "@railgun-community/ledger-client": "github:Railgun-Community/ledger-client#v0.2.1"
 }
 ```
 
 **From a release tarball** — a pre-built package, no build on install:
 
 ```bash
-yarn add https://github.com/Railgun-Community/ledger-client/releases/download/v0.2.0/railgun-community-ledger-client-0.2.0.tgz
+yarn add https://github.com/Railgun-Community/ledger-client/releases/download/v0.2.1/railgun-community-ledger-client-0.2.1.tgz
 ```
 
 ## Architecture
