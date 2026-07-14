@@ -2,7 +2,7 @@
  * Transport layer types.
  *
  * Abstracts the communication channel to a hardware wallet device.
- * Implementations: WebHID (primary), BLE (future).
+ * Implementations: WebHID (browser), Node HID (CLI), BLE (future — inject via transportFactory).
  */
 
 /** Raw APDU command to send to the device. */
@@ -46,7 +46,7 @@ export const StatusWord = {
 export type StatusWord = (typeof StatusWord)[keyof typeof StatusWord];
 
 /** Transport type discriminator. */
-export type TransportType = 'webhid' | 'ble';
+export type TransportType = 'webhid' | 'nodehid' | 'ble';
 
 /** Abstract transport interface — all device communication goes through this. */
 export interface HWTransport {

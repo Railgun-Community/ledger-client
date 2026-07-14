@@ -3,6 +3,7 @@ import { HWError, HWErrorCode } from '../../core/errors.js';
 import type { LedgerController } from '../controller/types.js';
 import type {
   EngineLedgerConnector,
+  EngineLedgerConnectorBase,
   LegacyEngineLedgerConnector,
 } from './types.js';
 
@@ -21,14 +22,15 @@ function requirePublicInputs(
   }
 }
 
-export function createEngineLedgerConnector(
+/**
+ * Shared value-typed methods for both engine connectors. Deliberately excludes
+ * `type` and `deviceId`: `deviceId` is a live getter each factory declares inline,
+ * and spreading it here would flatten it to a construction-time snapshot.
+ */
+function createEngineConnectorMethods(
   controller: LedgerController,
-): EngineLedgerConnector {
+): Omit<EngineLedgerConnectorBase, 'type' | 'deviceId'> {
   return {
-    type: 'ledger',
-    get deviceId(): string {
-      return controller.getSnapshot().deviceSession?.deviceSessionId ?? 'ledger:disconnected';
-    },
     sign: (expectedHash, publicInputs, subSession): Promise<Signature> => {
       requirePublicInputs(publicInputs);
       return controller.sign(expectedHash, publicInputs, subSession);
@@ -43,10 +45,22 @@ export function createEngineLedgerConnector(
         }),
     signEthTransaction: (rawTxHex, derivationIndex) =>
       controller.signEthTransaction(rawTxHex, derivationIndex),
-    requestBatchApproval: (requests) => controller.requestBatchApproval(requests),
     getPublicKey: () => controller.getPublicKey(),
     isConnected: () => controller.getSnapshot().deviceSession !== null,
     disconnect: () => controller.disconnect(),
+  };
+}
+
+export function createEngineLedgerConnector(
+  controller: LedgerController,
+): EngineLedgerConnector {
+  return {
+    type: 'ledger',
+    get deviceId(): string {
+      return controller.getSnapshot().deviceSession?.deviceSessionId ?? 'ledger:disconnected';
+    },
+    ...createEngineConnectorMethods(controller),
+    requestBatchApproval: (requests) => controller.requestBatchApproval(requests),
   };
 }
 
@@ -58,20 +72,7 @@ export function createLegacyEngineLedgerConnector(
     get deviceId(): string {
       return controller.getSnapshot().deviceSession?.deviceSessionId ?? 'ledger:disconnected';
     },
-    sign: (expectedHash, publicInputs, subSession): Promise<Signature> => {
-      requirePublicInputs(publicInputs);
-      return controller.sign(expectedHash, publicInputs, subSession);
-    },
-    hwSignShield: (derivationIndex) =>
-      controller.hwSignShield(derivationIndex),
-    ...(controller.signShieldOwnershipMarker === undefined
-      ? {}
-      : {
-          signShieldOwnershipMarker: (derivationIndex: number) =>
-            controller.signShieldOwnershipMarker!(derivationIndex),
-        }),
-    signEthTransaction: (rawTxHex, derivationIndex) =>
-      controller.signEthTransaction(rawTxHex, derivationIndex),
+    ...createEngineConnectorMethods(controller),
     requestBatchApproval: async (requests: readonly RequestApprovalOptions[]): Promise<boolean> => {
       const result = await controller.requestBatchApproval(requests);
       if (!result.approved) {
@@ -79,8 +80,5 @@ export function createLegacyEngineLedgerConnector(
       }
       return true;
     },
-    getPublicKey: () => controller.getPublicKey(),
-    isConnected: () => controller.getSnapshot().deviceSession !== null,
-    disconnect: () => controller.disconnect(),
   };
 }

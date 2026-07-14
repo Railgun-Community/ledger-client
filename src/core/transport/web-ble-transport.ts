@@ -1,13 +1,19 @@
 /**
- * Node HID transport adapter.
+ * Web BLE transport adapter.
  *
- * Wraps @ledgerhq/hw-transport-node-hid behind the HWTransport interface.
- * Used for CLI tools and Node.js test runners — NOT for browser use.
+ * Wraps @ledgerhq/hw-transport-web-ble behind the HWTransport interface for a
+ * Ledger device over Web Bluetooth (browser). The underlying transport is an
+ * OPTIONAL peer dependency, loaded lazily on connect() so consumers that never
+ * use BLE do not need it installed and createTransport stays synchronous.
  *
- * Requires native `node-hid` bindings (compiled via node-gyp).
+ * Invariants:
+ * - connect() requires a user gesture (Web Bluetooth device-selection prompt)
+ * - send()/rawExchange() reject if not connected
+ * - Timeout enforced on every APDU exchange
+ * - Disconnect listeners fire on both explicit disconnect and link loss
  */
 
-import type { HWTransport, ApduCommand, ApduResponse } from './types.js';
+import type { HWTransport, ApduCommand, ApduResponse, TransportConfig } from './types.js';
 import { HWError, HWErrorCode } from '../errors.js';
 import { deserializeApduResponse } from './apdu-wire.js';
 
@@ -15,22 +21,33 @@ import { deserializeApduResponse } from './apdu-wire.js';
 const DEFAULT_TIMEOUT = 30_000;
 
 /**
- * Dynamically import the Ledger Node HID transport.
+ * Dynamically import the Ledger Web BLE transport (optional peer dependency).
  */
-async function importNodeHIDTransport(): Promise<typeof import('@ledgerhq/hw-transport-node-hid').default> {
-  const mod = await import('@ledgerhq/hw-transport-node-hid');
+async function importWebBLETransport(): Promise<typeof import('@ledgerhq/hw-transport-web-ble').default> {
+  const mod = await import('@ledgerhq/hw-transport-web-ble');
   return mod.default;
 }
 
-export class NodeHIDTransport implements HWTransport {
-  readonly type = 'nodehid' as const;
+/**
+ * Minimal structural view of the underlying @ledgerhq Transport. Structural (not
+ * the nominal class) so it stays assignable even when the BLE lib bundles its own
+ * copy of @ledgerhq/hw-transport at a different version.
+ */
+type UnderlyingTransport = {
+  exchange(apdu: Uint8Array): Promise<Uint8Array>;
+  on(eventName: string, cb: (...args: unknown[]) => void): void;
+  close(): Promise<void>;
+};
 
-  private _transport: import('@ledgerhq/hw-transport').default | null = null;
+export class WebBLETransport implements HWTransport {
+  readonly type = 'ble' as const;
+
+  private _transport: UnderlyingTransport | null = null;
   private _disconnectCallbacks: Array<() => void> = [];
   private _timeout: number;
 
-  constructor(timeout?: number) {
-    this._timeout = timeout ?? DEFAULT_TIMEOUT;
+  constructor(config?: TransportConfig) {
+    this._timeout = config?.timeout ?? DEFAULT_TIMEOUT;
   }
 
   async connect(): Promise<void> {
@@ -41,13 +58,20 @@ export class NodeHIDTransport implements HWTransport {
       );
     }
 
+    if (typeof globalThis.navigator === 'undefined' || !('bluetooth' in globalThis.navigator)) {
+      throw new HWError(
+        HWErrorCode.TRANSPORT_NOT_AVAILABLE,
+        'Web Bluetooth is not available. Requires HTTPS or localhost in a supported browser.',
+      );
+    }
+
     try {
-      const TransportNodeHID = await importNodeHIDTransport();
-      this._transport = await TransportNodeHID.create();
+      const TransportWebBLE = await importWebBLETransport();
+      this._transport = await TransportWebBLE.create();
     } catch (err: unknown) {
       throw new HWError(
         HWErrorCode.TRANSPORT_CONNECTION_FAILED,
-        'Failed to connect via Node HID. Is the device plugged in and unlocked?',
+        'Failed to connect via Web Bluetooth. User may have cancelled the device prompt.',
         err,
       );
     }
@@ -78,9 +102,9 @@ export class NodeHIDTransport implements HWTransport {
     }
 
     try {
-      // Build raw APDU: [CLA, INS, P1, P2, Lc, ...data]
-      // Use exchange() directly to avoid the SDK's send() which adds
-      // status word filtering that breaks multi-round APDU protocols.
+      // Build raw APDU [CLA, INS, P1, P2, Lc, ...data] and exchange() directly,
+      // avoiding the SDK send() status-word filtering that breaks the RAILGUN
+      // multi-round APDU protocols.
       const data = command.data !== undefined && command.data.length > 0
         ? command.data
         : new Uint8Array(0);
@@ -96,7 +120,7 @@ export class NodeHIDTransport implements HWTransport {
       apdu.set(data, header.length);
 
       const result = await this._withTimeout(
-        this._transport.exchange(apdu as never),
+        this._transport.exchange(apdu),
       );
 
       const raw = new Uint8Array(result);
@@ -127,7 +151,7 @@ export class NodeHIDTransport implements HWTransport {
 
     try {
       const result = await this._withTimeout(
-        this._transport.exchange(Uint8Array.from(apdu) as never),
+        this._transport.exchange(Uint8Array.from(apdu)),
       );
       return new Uint8Array(result);
     } catch (err: unknown) {
@@ -148,23 +172,6 @@ export class NodeHIDTransport implements HWTransport {
       this._disconnectCallbacks = this._disconnectCallbacks.filter((c) => c !== cb);
     };
   }
-
-  /**
-   * Expose the raw Ledger SDK transport for direct use by hw-app-eth.
-   * This is needed because those SDK apps expect a native Transport instance,
-   * not our HWTransport wrapper.
-   */
-  getRawTransport(): import('@ledgerhq/hw-transport').default {
-    if (this._transport === null) {
-      throw new HWError(
-        HWErrorCode.TRANSPORT_DISCONNECTED,
-        'Cannot get raw transport: not connected.',
-      );
-    }
-    return this._transport;
-  }
-
-  // ─── Private ────────────────────────────────────────────────────────────────
 
   private _handleDisconnect(): void {
     this._transport = null;

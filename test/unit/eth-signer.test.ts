@@ -119,7 +119,8 @@ describe('EthSigner', () => {
       expect(signTransactionMock).toHaveBeenCalledWith(
         "m/44'/60'/0'/0/3",
         'deadbeef',
-        null,
+        // non-blind: an empty clear-signing resolution (not null) so the ETH app displays the tx
+        { erc20Tokens: [], nfts: [], externalPlugin: [], plugin: [], domains: [] },
       );
       expect(result).toEqual({
         type: 'eth',

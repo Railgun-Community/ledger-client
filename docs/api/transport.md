@@ -2,13 +2,13 @@
 
 The transport is the channel to the device. Everything above it (signers, controller) is
 transport-agnostic and talks through the `HWTransport` interface, so the same logic runs over
-WebHID in the browser, Node HID in scripts, or a mock in tests.
+WebHID or Web Bluetooth (BLE) in the browser, Node HID in scripts, or a mock in tests.
 
 ## `HWTransport`
 
 ```ts
 interface HWTransport {
-  readonly type: TransportType;              // 'webhid' | 'ble'
+  readonly type: TransportType;              // 'webhid' | 'nodehid' | 'ble'
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   send(command: ApduCommand): Promise<ApduResponse>;   // structured APDU
@@ -37,9 +37,11 @@ const transport = await createTransport({ type: 'webhid' }); // or: new WebHIDTr
 await transport.connect(); // prompts the user to pick their Ledger (requires a user gesture)
 ```
 
-`createTransport(config?: TransportConfig)` is the factory; `TransportConfig` is
-`{ type: 'webhid' | 'ble'; timeout?: number }` (default timeout 30000ms). Only `'webhid'` is
-implemented today — `'ble'` throws.
+`createTransport(config?: TransportConfig)` is the browser factory; `TransportConfig` is
+`{ type: 'webhid' | 'nodehid' | 'ble'; timeout?: number }` (default timeout 30000ms). It builds
+`'webhid'` and `'ble'` (Web Bluetooth, via the optional peer dep `@ledgerhq/hw-transport-web-ble`,
+loaded lazily on `connect()`). `'nodehid'` throws a directional `HWError` — Node HID is Node-only
+(import `NodeHIDTransport` directly, see below).
 
 **Browser requirements for WebHID:**
 - a **secure context** (HTTPS or `localhost`)
@@ -59,6 +61,13 @@ rather than touching real hardware.
   `createLedgerController(...)` — the controller owns `connect`/`disconnect`.
 - With a **direct signer**: create and connect the transport yourself, then pass it to
   `new RailgunSigner({ transport })` / `new EthSigner({ transport })`.
+- **BLE (Web Bluetooth):** built in — `createTransport({ type: 'ble' })` (or `new WebBLETransport()`),
+  then `connect()`. Requires the optional peer dep `@ledgerhq/hw-transport-web-ble` and a
+  Bluetooth-capable secure context; `isBLEAvailable()` is the environment probe (symmetric with
+  `isWebHIDAvailable()`). The dep is loaded lazily, so consumers that never use BLE don't need it.
+- **A custom transport:** implement the `HWTransport` interface (see `WebHIDTransport` /
+  `WebBLETransport` for reference) and inject it via `transportFactory: () => new MyTransport()`.
+  No core change is needed.
 
 ## Errors
 

@@ -138,6 +138,89 @@ describe('engine connector shield compatibility', () => {
   });
 });
 
+describe('engine connector deviceId getter', () => {
+  it('re-reads the live controller snapshot instead of freezing at construction', () => {
+    const controller = createController();
+    let sessionId: string | null = null;
+    vi.mocked(controller.getSnapshot).mockImplementation(() => ({
+      mode: 'signer',
+      readiness: 'ready',
+      action: 'idle',
+      isBusy: false,
+      connectorAvailable: false,
+      requiredApp: null,
+      deviceSession:
+        sessionId === null
+          ? null
+          : {
+              deviceSessionId: sessionId,
+              deviceInfo: null,
+              activeApp: null,
+              installedApps: [],
+            },
+      approvalSession: null,
+      modal: { kind: 'none' },
+      error: null,
+    }));
+
+    // Built while disconnected.
+    const engine = createEngineLedgerConnector(controller);
+    const legacy = createLegacyEngineLedgerConnector(controller);
+    expect(engine.deviceId).toBe('ledger:disconnected');
+    expect(legacy.deviceId).toBe('ledger:disconnected');
+
+    // A device connects afterwards: a live getter reflects it. A frozen snapshot
+    // from a spread-flattened factory would stay 'ledger:disconnected' here.
+    sessionId = 'device-42';
+    expect(engine.deviceId).toBe('device-42');
+    expect(legacy.deviceId).toBe('device-42');
+
+    // A later disconnect is reflected too.
+    sessionId = null;
+    expect(engine.deviceId).toBe('ledger:disconnected');
+  });
+});
+
+describe('engine connector batch approval', () => {
+  it('engine connector returns the controller approval session verbatim', async () => {
+    const controller = createController();
+    const session = {
+      approved: true,
+      subSession: 'sub-9',
+      approvalDigest: 'digest-9',
+      deviceSessionId: 'device-1',
+      createdAt: 0,
+    };
+    vi.mocked(controller.requestBatchApproval).mockResolvedValue(session);
+    const connector = createEngineLedgerConnector(controller);
+
+    await expect(connector.requestBatchApproval([])).resolves.toBe(session);
+  });
+
+  it('legacy connector resolves true when the controller approves', async () => {
+    const controller = createController();
+    const connector = createLegacyEngineLedgerConnector(controller);
+
+    await expect(connector.requestBatchApproval([])).resolves.toBe(true);
+  });
+
+  it('legacy connector throws BATCH_REJECTED when the controller rejects', async () => {
+    const controller = createController();
+    vi.mocked(controller.requestBatchApproval).mockResolvedValue({
+      approved: false,
+      subSession: 'sub-x',
+      approvalDigest: 'digest-x',
+      deviceSessionId: 'device-1',
+      createdAt: 0,
+    });
+    const connector = createLegacyEngineLedgerConnector(controller);
+
+    await expect(connector.requestBatchApproval([])).rejects.toMatchObject({
+      code: 'BATCH_REJECTED',
+    });
+  });
+});
+
 describe('RAILGUN RelayAdapt7702 hooked signer', () => {
   it('prepares a RAILGUN 7702 signer and signs authorizations through the controller', async () => {
     const controller = createController();

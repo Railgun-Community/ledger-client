@@ -3,6 +3,28 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.2.1 — 2026-07-14
+
+### Added
+
+- **Web Bluetooth (BLE) transport.** `WebBLETransport` + `createTransport({ type: 'ble' })` connect a
+  Ledger over Web Bluetooth. `@ledgerhq/hw-transport-web-ble` is an optional peer dependency, loaded
+  lazily on `connect()` so consumers that never use BLE don't pull it in. `isBLEAvailable()` probes the
+  environment (symmetric with `isWebHIDAvailable()`).
+- `TransportType` now includes `'nodehid'`, and the Node HID transport reports it truthfully (it
+  previously mislabeled itself as `'webhid'`). `createTransport` returns a directional error for
+  `'nodehid'` (Node-only, import `NodeHIDTransport` directly) and constructs `'ble'`.
+
+### Changed
+
+- **Ethereum transactions are clear-signed, not blind.** `EthSigner.signTransaction` passes an empty
+  clear-signing resolution so the Ledger ETH app parses and displays the transaction for on-device
+  review, instead of forcing device "blind signing".
+- Internal: the three Ledger connector types now share base types (no change to their resolved public
+  shapes), and the two engine connector factories share a builder.
+
+No breaking changes.
+
 ## 0.2.0 — 2026-07-10
 
 ### Breaking

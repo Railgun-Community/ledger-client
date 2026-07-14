@@ -21,6 +21,18 @@ export function isWebHIDAvailable(): boolean {
 }
 
 /**
+ * Check if Web Bluetooth (BLE) is available in the current environment.
+ * Real BLE reachability is ultimately determined by the injected transport;
+ * this is the environment-capability probe, symmetric with isWebHIDAvailable().
+ */
+export function isBLEAvailable(): boolean {
+  return (
+    typeof globalThis.navigator !== 'undefined' &&
+    'bluetooth' in globalThis.navigator
+  );
+}
+
+/**
  * Check if transport is connected.
  */
 export function hasTransport(ctx: MachineContext): boolean {

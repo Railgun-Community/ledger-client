@@ -1,6 +1,6 @@
 {
   "name": "@railgun-community/ledger-client",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "RAILGUN hardware wallet connector — Ledger-first, state-machine-driven TSX component",
   "type": "module",
   "main": "dist/index.js",
@@ -42,6 +42,7 @@
     "@ledgerhq/hw-app-eth": "^6.41.0",
     "@ledgerhq/hw-transport": "^6.31.0",
     "@ledgerhq/hw-transport-node-hid": "^6.32.1",
+    "@ledgerhq/hw-transport-web-ble": "^6.30.0",
     "@ledgerhq/hw-transport-webhid": "^6.30.0",
     "eslint": "^9.0.0",
     "jiti": "^2.7.0",
@@ -59,10 +60,14 @@
   "peerDependencies": {
     "@ledgerhq/hw-app-eth": "^6.41.0",
     "@ledgerhq/hw-transport": "^6.31.0",
+    "@ledgerhq/hw-transport-web-ble": "^6.30.0",
     "@ledgerhq/hw-transport-webhid": "^6.30.0"
   },
   "peerDependenciesMeta": {
     "@ledgerhq/hw-app-eth": {
+      "optional": true
+    },
+    "@ledgerhq/hw-transport-web-ble": {
       "optional": true
     },
     "@ledgerhq/hw-transport-webhid": {

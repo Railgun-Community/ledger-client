@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createTransport } from '../../src/core/transport/transport-factory.js';
 import { WebHIDTransport } from '../../src/core/transport/webhid-transport.js';
+import { WebBLETransport } from '../../src/core/transport/web-ble-transport.js';
 import { HWError } from '../../src/core/errors.js';
 
 describe('createTransport', () => {
@@ -19,7 +20,14 @@ describe('createTransport', () => {
     expect(transport).toBeInstanceOf(WebHIDTransport);
   });
 
-  it('throws for BLE (not implemented)', () => {
-    expect(() => createTransport({ type: 'ble' })).toThrow(HWError);
+  it('creates a BLE transport', () => {
+    const transport = createTransport({ type: 'ble' });
+    expect(transport).toBeInstanceOf(WebBLETransport);
+    expect(transport.type).toBe('ble');
+  });
+
+  it('throws for nodehid, directing to direct import or transportFactory', () => {
+    expect(() => createTransport({ type: 'nodehid' })).toThrow(HWError);
+    expect(() => createTransport({ type: 'nodehid' })).toThrow(/Node HID|transportFactory/);
   });
 });

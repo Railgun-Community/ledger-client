@@ -273,6 +273,7 @@ export {
 // ─── Transport factory ───────────────────────────────────────────────────────
 export { createTransport } from './core/transport/transport-factory.js';
 export { WebHIDTransport } from './core/transport/webhid-transport.js';
+export { WebBLETransport } from './core/transport/web-ble-transport.js';
 
 // ─── Device-state recovery ───────────────────────────────────────────────────
 export { clearDeviceState } from './core/transport/clear-state.js';
@@ -323,6 +324,7 @@ export { createLedgerTransportAdapter } from './core/transport/ledger-transport-
 export { transition, createInitialContext } from './core/state-machine/machine.js';
 export {
   isWebHIDAvailable,
+  isBLEAvailable,
   hasTransport,
   isAppInstalled,
   isAppVersionSatisfied,
