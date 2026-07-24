@@ -111,4 +111,30 @@ describe('CLEAR_SIGN dual-tx', () => {
     })).rejects.toThrow(/at least 2/);
     expect(transport.sentCommands).toHaveLength(0);
   });
+
+  const bp = { treeNumber: 0, minGasPrice: 0n, unshield: false, chainId: 1n } as const;
+  const change = { kind: 'change', tokenHash: DAI_HASH, value: 1n } as const;
+
+  it('rejects an illegal shape in a later sub-tx before any APDU', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    const signer = new RailgunSigner({ transport });
+    await expect(signer.signClearSignMultiTransact({
+      transactions: [
+        { merkleRoot: new Uint8Array(32).fill(0x11), nullifiers: [new Uint8Array(32)], boundParams: bp, outputs: [change, change] },
+        // second tx: n=3, m=3 → n+m=6 > 5
+        { merkleRoot: new Uint8Array(32).fill(0x22), nullifiers: [new Uint8Array(32), new Uint8Array(32), new Uint8Array(32)], boundParams: bp, outputs: [change, change, change] },
+      ],
+    })).rejects.toThrow(/n\+m/);
+    expect(transport.sentCommands).toHaveLength(0);
+  });
+
+  it('rejects more than 2 transactions (device CS_MAX_TXS = 2) before any APDU', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    const signer = new RailgunSigner({ transport });
+    const tx = { merkleRoot: new Uint8Array(32), nullifiers: [new Uint8Array(32)], boundParams: bp, outputs: [change] } as const;
+    await expect(signer.signClearSignMultiTransact({ transactions: [tx, tx, tx] })).rejects.toThrow(/1\.\.2/);
+    expect(transport.sentCommands).toHaveLength(0);
+  });
 });

@@ -140,4 +140,35 @@ describe('RailgunSigner.signClearSignTransact', () => {
       outputs: [{ kind: 'unshield', recipientAddress: VITALIK, tokenHash: DAI_HASH, value: 1n }],
     })).rejects.toMatchObject({ code: HWErrorCode.APDU_REJECTED });
   });
+
+  it('validates every field width before opening a session (illegal nullifier → no APDU)', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    const signer = new RailgunSigner({ transport });
+    await expect(signer.signClearSignTransact({
+      merkleRoot: new Uint8Array(32).fill(0x11),
+      nullifiers: [new Uint8Array(31)], // wrong width — must throw before any APDU
+      boundParams: { treeNumber: 0, minGasPrice: 1n, unshield: true, chainId: 1n },
+      outputs: [{ kind: 'unshield', recipientAddress: VITALIK, tokenHash: DAI_HASH, value: 1n }],
+    })).rejects.toThrow(/nullifier/);
+    expect(transport.sentCommands).toHaveLength(0);
+  });
+
+  it('rejects a wrong-length OUT_* response', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    transport.enqueueResponses([
+      ok(new Uint8Array(0)), // CS_INIT
+      ok(new Uint8Array(0)), // NULLIFIER
+      ok(new Uint8Array(0)), // BP_FIELDS
+      ok(new Uint8Array(31)), // OUT_UNSHIELD — expected 32B
+    ]);
+    const signer = new RailgunSigner({ transport });
+    await expect(signer.signClearSignTransact({
+      merkleRoot: new Uint8Array(32).fill(0x11),
+      nullifiers: [new Uint8Array(32).fill(0x22)],
+      boundParams: { treeNumber: 0, minGasPrice: 1n, unshield: true, chainId: 1n },
+      outputs: [{ kind: 'unshield', recipientAddress: VITALIK, tokenHash: DAI_HASH, value: 1n }],
+    })).rejects.toMatchObject({ code: HWErrorCode.APDU_INVALID_RESPONSE });
+  });
 });

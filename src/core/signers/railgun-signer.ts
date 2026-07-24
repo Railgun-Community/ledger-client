@@ -290,29 +290,31 @@ export class RailgunSigner {
     const nIn = request.nullifiers.length;
     const nOut = request.outputs.length;
     validateClearSignShape(nIn, nOut);
-
     const account = request.account ?? this.account;
-    await this.sendClearSignStep(buildClearSignInit(
-      { account, merkleRoot: request.merkleRoot, nIn, nOut },
-      this.profile,
-    ));
-    for (const nullifier of request.nullifiers) {
-      await this.sendClearSignStep(buildClearSignNullifier(nullifier, this.profile));
+
+    // Pre-build the whole session first: every builder validates its field widths
+    // and ranges, so any illegal input throws BEFORE the first APDU is sent and
+    // never opens a session on the stateful device.
+    const initCommand = buildClearSignInit({ account, merkleRoot: request.merkleRoot, nIn, nOut }, this.profile);
+    const nullifierCommands = request.nullifiers.map((nullifier) => buildClearSignNullifier(nullifier, this.profile));
+    const bpCommand = buildClearSignBpFields(request.boundParams, this.profile);
+    const outputPlan = request.outputs.map((output) => ({ kind: output.kind, ...buildClearSignOutput(output, this.profile) }));
+    const finalizeCommand = buildClearSignFinalize(this.profile);
+
+    await this.sendClearSignStep(initCommand);
+    for (const command of nullifierCommands) {
+      await this.sendClearSignStep(command);
     }
-    await this.sendClearSignStep(buildClearSignBpFields(request.boundParams, this.profile));
+    await this.sendClearSignStep(bpCommand);
 
     const outputs: ClearSignOutputResult[] = [];
-    for (const output of request.outputs) {
-      const { command, responseLength } = buildClearSignOutput(output, this.profile);
+    for (const { kind, command, responseLength } of outputPlan) {
       const response = await this.transport.send(command);
       validateApduResponse(response);
-      outputs.push({
-        kind: output.kind,
-        response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${output.kind}`),
-      });
+      outputs.push({ kind, response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${kind}`) });
     }
 
-    const finalizeResponse = await this.transport.send(buildClearSignFinalize(this.profile));
+    const finalizeResponse = await this.transport.send(finalizeCommand);
     validateApduResponse(finalizeResponse);
     const { signature, msgHash } = parseClearSignFinalize(finalizeResponse.data);
     validateSignature(signature);
@@ -339,29 +341,31 @@ export class RailgunSigner {
       validateClearSignShape(tx.nullifiers.length, tx.outputs.length);
     }
 
-    await this.sendClearSignStep(buildClearSignInitMultiTx(
-      { ...request, account: request.account ?? this.account },
-      this.profile,
-    ));
+    // Pre-build the whole multi-tx session (the multi CS_INIT also enforces nTx <= 2
+    // and each sub-tx's field widths) so any illegal input throws before any APDU.
+    const initCommand = buildClearSignInitMultiTx({ ...request, account: request.account ?? this.account }, this.profile);
+    const txPlans = request.transactions.map((tx) => ({
+      nullifierCommands: tx.nullifiers.map((nullifier) => buildClearSignNullifier(nullifier, this.profile)),
+      bpCommand: buildClearSignBpFields(tx.boundParams, this.profile),
+      outputPlan: tx.outputs.map((output) => ({ kind: output.kind, ...buildClearSignOutput(output, this.profile) })),
+    }));
+    const finalizeCommand = buildClearSignFinalize(this.profile);
 
+    await this.sendClearSignStep(initCommand);
     const outputs: ClearSignOutputResult[] = [];
-    for (const tx of request.transactions) {
-      for (const nullifier of tx.nullifiers) {
-        await this.sendClearSignStep(buildClearSignNullifier(nullifier, this.profile));
+    for (const plan of txPlans) {
+      for (const command of plan.nullifierCommands) {
+        await this.sendClearSignStep(command);
       }
-      await this.sendClearSignStep(buildClearSignBpFields(tx.boundParams, this.profile));
-      for (const output of tx.outputs) {
-        const { command, responseLength } = buildClearSignOutput(output, this.profile);
+      await this.sendClearSignStep(plan.bpCommand);
+      for (const { kind, command, responseLength } of plan.outputPlan) {
         const response = await this.transport.send(command);
         validateApduResponse(response);
-        outputs.push({
-          kind: output.kind,
-          response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${output.kind}`),
-        });
+        outputs.push({ kind, response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${kind}`) });
       }
     }
 
-    const finalizeResponse = await this.transport.send(buildClearSignFinalize(this.profile));
+    const finalizeResponse = await this.transport.send(finalizeCommand);
     validateApduResponse(finalizeResponse);
     const signatures = parseClearSignFinalizeMulti(finalizeResponse.data, txCount);
     for (const { signature } of signatures) validateSignature(signature);

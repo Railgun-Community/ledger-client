@@ -395,8 +395,9 @@ export function buildClearSignInitMultiTx(
   profile: ApduProfile = RAILGUN_PROFILE,
 ): ApduCommand {
   const nTx = request.transactions.length;
-  if (!Number.isInteger(nTx) || nTx < 1 || nTx > 255) {
-    throw new Error(`CLEAR_SIGN multi-tx requires 1..255 transactions, got ${String(nTx)}`);
+  // Device caps a multi-tx session at CS_MAX_TXS = 2 (txToken != feeToken).
+  if (!Number.isInteger(nTx) || nTx < 1 || nTx > 2) {
+    throw new Error(`CLEAR_SIGN multi-tx supports 1..2 transactions, got ${String(nTx)}`);
   }
   const walletSource = request.walletSource ?? new Uint8Array(15);
   assertBytes(walletSource, 15, 'CLEAR_SIGN walletSource');
