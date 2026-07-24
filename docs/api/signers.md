@@ -40,19 +40,33 @@ const signature = await signer.sign(poseidonHash); // { R8: [x, y], S } — conf
 > viewing secret required by the current engine format. Never log it or route it through
 > `onProgress`/telemetry.
 
+### Display / verify accessors
+
+Two commands read public identifiers behind an on-device confirmation (the device shows the
+value so the user can compare it against an out-of-band source). Neither exposes a secret.
+
+| Method | Returns | Notes |
+|--------|---------|-------|
+| `getViewingPublicKey()` | `Uint8Array` (32B) | Compressed Ed25519 viewing **public** key (`INS 0x10`). Display/verify only — does **not** export the viewing secret; wallet loading still uses `getWalletArtifacts()`. |
+| `getRailgunAddress()` | `string` | The canonical 127-char `0zk1…` address (`INS 0x14`) — a device-confirmed cross-check of the host-derived address. |
+
 ### Ethereum / EIP-7702 methods (under development)
 
-The RAILGUN app derives Ethereum EOAs from the firmware path
-`m/7702'/1984'/account'/chainId/ephemeralIndex`. These methods are gated on the app's
+The RAILGUN app derives Ethereum EOAs from a **caller-chosen** path
+`m/7702'/1984'/account'/chainId'/ephemeralIndex'`. All three trailing words —
+`account` (W0), `chainId` (W1), `ephemeralIndex` (W2) — are settable, and because `chainId`
+is one of them, **each chain derives a distinct EOA** (chain-scoped: a wallet can run on many
+chains at once without reusing a 7702 address). Each word is a hardened index and must fit in
+31 bits, so chains with `chainId >= 2**31` are rejected. These methods are gated on the app's
 advertised capabilities and throw `APP_VERSION_MISMATCH` if unsupported.
 
 | Method | Purpose |
 |--------|---------|
 | `getEthereumAddress(display?)` | Derive the RAILGUN-app EOA address + public key. |
-| `prepareEthereumSigner(request)` | Preload/derive the EOA for a `{ railgunAccountIndex, chainId, ephemeralIndex }` session (binds later signatures to the same path). |
-| `signEip7702Authorization(request)` | Sign an EIP-7702 authorization (`INS 0x08`). |
-| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (clear signing). |
-| `get7702Signer(request, options?)` | Return an engine-compatible RelayAdapt7702 hooked signer. |
+| `prepareEthereumSigner(request)` | Preload/derive the EOA for a `{ railgunAccountIndex, chainId, ephemeralIndex }` session (binds later signatures to the same chain-scoped path). |
+| `signEip7702Authorization(request)` | Sign an EIP-7702 authorization (`INS 0x08`). Rejects an explicit `path` whose chainId word (W1) disagrees with the authorization `chainId`. |
+| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (clear signing); firmware requires `P1 = 0x01`, so standalone `display: false` is rejected. |
+| `get7702Signer(request, options?)` | Return an engine-compatible RelayAdapt7702 hooked signer. `request` = `{ chainId, ephemeralIndex, railgunAccountIndex? }` — all three path words are customizable (`railgunAccountIndex` defaults to the signer's account). |
 
 **Guidance:** prefer `display: true` (clear signing) so the device shows context; treat
 blind/hash-only signing (`display: false`) as an explicit, audited opt-in. For RAILGUN

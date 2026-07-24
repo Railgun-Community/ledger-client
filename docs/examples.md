@@ -84,21 +84,23 @@ if (capabilities.eip7702Authorization && capabilities.ethereumTxHash) {
 
   const outerTxSignature = await signer.signEthereumTxHash(txHashBytes, {
     session,
-    display: false,
+    display: true,
   });
 }
 ```
 
-`prepareEthereumSigner()` binds the app-native Ethereum signing context to the
-firmware-supported 7702 EOA path
-`m/7702'/1984'/railgunAccountIndex'/chainId/ephemeralIndex`. The RAILGUN app's
-`INS 0x07` preload APDU sends those trailing three words to derive the same EOA
-that `INS 0x08` and `INS 0x09` later sign with.
+`prepareEthereumSigner()` binds the app-native Ethereum signing context to a
+**caller-chosen** 7702 EOA path
+`m/7702'/1984'/account'/chainId'/ephemeralIndex'`. All three trailing words are
+customizable, and because `chainId` is word W1 each chain derives a **distinct** EOA
+(chain-scoped — one wallet across many chains without reusing an address). The RAILGUN
+app's `INS 0x07` preload APDU sends those three words to derive the same EOA that
+`INS 0x08` and `INS 0x09` later sign with. To vary the account per signer, use
+`get7702Signer({ chainId, ephemeralIndex, railgunAccountIndex })`.
 
 `signEip7702Authorization()` uses the custom RAILGUN app `INS 0x08` APDU.
-`signEthereumTxHash()` uses `INS 0x09`; `display: true` requires the profile's
-`clear` signing capability, while `display: false` uses the gated/blind signing
-capability for the second step of a 7702 authorization flow.
+`signEthereumTxHash()` uses `INS 0x09` with `P1 = 0x01` (on-device review); firmware
+1.6.1 rejects a standalone `P1 = 0x00`, so pass `display: true`.
 
 For an EIP-712 routing experiment through the standard Ethereum app, use the
 custom-path helpers and verify the returned ETH-app address matches the RAILGUN
