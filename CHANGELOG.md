@@ -3,6 +3,47 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.3.0 — 2026-07-24
+
+Aligns the client with RAILGUN firmware **1.6.1 (clear-sign-v1)**. Requires that build on
+the device — install it with `yarn install:app --target flex|nanosp`.
+
+### Breaking
+
+- **Spending-public-key retrieval now targets firmware ≥ 1.6.1.** `buildGetPublicKey` sends
+  `P1 = 0x01` (display + confirm); the device shows the account index and pubkey and returns the
+  key only on approval, and production firmware rejects `P1 = 0x00`. As a result `getPublicKey()`
+  and `getWalletArtifacts()` now require an on-device confirmation (previously silent), and against
+  older firmware the spending-key fetch fails.
+
+### Added
+
+- **Viewing public key (`getViewingPublicKey` / `buildGetViewingPublicKey`, INS 0x10)** — returns the
+  32-byte compressed Ed25519 viewing *public* key for on-device display/verify. Does not export the
+  viewing secret; wallet loading still uses the viewing private key.
+- **RAILGUN address (`getRailgunAddress` / `buildGetRailgunAddress`, INS 0x14)** — returns the 127-byte
+  `0zk1…` address for on-device cross-check of the host-derived address.
+- **CLEAR_SIGN transact protocol builders (INS 0x11, experimental)** — pure builders for the full
+  single-tx session (`buildClearSignInit`, `…Nullifier`, `…BpFields`, `…OutBroadcaster`, `…OutChange`,
+  `…OutTransfer`, `…OutUnshield`, `…Finalize`), plus `validateClearSignShape`, `encodeErc20TokenHash`,
+  and `parseClearSignFinalize`. Session orchestration and engine wiring are not included yet.
+- **Fully customizable, chain-scoped EIP-7702 derivation path.** `get7702Signer` accepts an optional
+  `railgunAccountIndex`; the path words `account (W0) / chainId (W1) / ephemeralIndex (W2)` are all
+  caller-settable, so each chain derives a distinct EOA and a wallet can operate on multiple chains at
+  once. `signEip7702Authorization` rejects an explicit path whose chainId word (W1) disagrees with the
+  authorization chainId.
+- Capability flags `viewingPublicKey` / `railgunAddress` / `railgunClearSign` on `RAILGUN_PROFILE`, and
+  `CAPABILITY_STATUS.clearSign` (experimental).
+
+### Changed
+
+- Bundled SCP install artifacts updated to the firmware 1.6.1 clear-sign-v1 build (flex + Nano S Plus).
+
+### Migration
+
+- Install firmware 1.6.1 (clear-sign-v1) on the device before upgrading; `getPublicKey()` /
+  `getWalletArtifacts()` now prompt on-device. No source-level API removals.
+
 ## 0.2.2 — 2026-07-14
 
 ### Changed
