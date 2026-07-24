@@ -160,8 +160,8 @@ B001000000
       const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
       const hash = computeCodeHash(apduData);
       expect(hash).toBeDefined();
-      // Snapshot: SHA-256 of code segments from the real APDU file
-      expect(hash).toBe('80cc62ba0a4ff0454509ddbbd6a47870cb3699fdc80ac1240f9324bb1208a4ec');
+      // Snapshot: SHA-256 of code segments from the real APDU file (firmware 1.6.1 clear-sign-v1)
+      expect(hash).toBe('aacf401b91474bff1152e1830e4250381dfd64f81492e86794ebf910dde6bc02');
     });
   });
 
@@ -199,8 +199,8 @@ B001000000
       const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
       const hash = computeAppHash(apduData, NANO_SP_TARGET_ID);
       expect(hash).toBeDefined();
-      // Snapshot: BOLOS "Application full hash" = SHA-256(targetId_BE32 + createAppParams + code_data)
-      expect(hash).toBe('25ca9f78e8ccbdbbe9d2d1b7a2c51ba677717682d7254b31585cf4efcc6750f5');
+      // Snapshot: BOLOS "Application full hash" = SHA-256(targetId_BE32 + createAppParams + code_data) (fw 1.6.1 clear-sign-v1)
+      expect(hash).toBe('693bca4b867beffd589bf16385d5147a4ee91ee489531e76cd9f1ef96df30fc6');
     });
 
     it('should differ when targetId changes', async () => {
@@ -254,8 +254,8 @@ B001000000
       const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
       const codeId = computeCodeId(apduData);
       expect(codeId).toBeDefined();
-      // Snapshot: BOLOS Code ID = SHA-256(code + data), excluding install_params.
-      expect(codeId).toBe('e559bc60f84314cb12911966b8f7fef7d6893935e210b222b2223e05d892f641');
+      // Snapshot: BOLOS Code ID = SHA-256(code + data), excluding install_params. (fw 1.6.1 clear-sign-v1)
+      expect(codeId).toBe('908ca6b59dccca7b7511fe05d9aa33d53a51ea4e3f25adab850b5ea9b3d56630');
     });
 
     it('should differ from computeCodeHash for the real APDU file', async () => {
