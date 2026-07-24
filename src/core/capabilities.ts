@@ -27,6 +27,8 @@ export const CAPABILITY_STATUS = {
   keyAttestation: 'experimental',
   /** RAILGUN signing (BabyJubjub EdDSA) via the custom app. */
   railgunSigning: 'experimental',
+  /** CLEAR_SIGN transact review protocol (INS 0x11) — new in firmware 1.6.1. */
+  clearSign: 'experimental',
   /** Ethereum tx / message / EIP-712 signing. */
   ethereumSigning: 'experimental',
   /** FROST / MPC threshold signing — NOT implemented on current firmware. */

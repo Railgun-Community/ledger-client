@@ -39,6 +39,12 @@ export type RailgunAppCapabilities = {
   readonly eip7702Authorization: boolean;
   readonly ethereumTxHash: boolean;
   readonly ethereumSigning: readonly EthereumSignCapability[];
+  /** Device can return the compressed Ed25519 viewing *public* key (INS 0x10). */
+  readonly viewingPublicKey: boolean;
+  /** Device can derive + display the canonical `0zk1…` address (INS 0x14). */
+  readonly railgunAddress: boolean;
+  /** Device supports the stateful CLEAR_SIGN transact review protocol (INS 0x11). */
+  readonly railgunClearSign: boolean;
 };
 
 /**
@@ -64,6 +70,15 @@ export type ApduProfile = {
     readonly sign: ApduSignDef;
     /** Get viewing private key. Response: privkey(32B). Optional — not all apps support this. */
     readonly getViewingKey?: ApduCommandDef;
+    /** Get compressed Ed25519 viewing public key (INS 0x10). Response: pubkey(32B). */
+    readonly getViewingPublicKey?: ApduCommandDef;
+    /** Derive + display the canonical `0zk1…` address (INS 0x14). Response: 127 ASCII bytes. */
+    readonly getRailgunAddress?: ApduCommandDef;
+    /**
+     * CLEAR_SIGN transact review protocol (INS 0x11). Stateful: P1 selects the
+     * sub-command and the response length varies per sub-command; the quoted
+     * `responseLength` is the single-tx FINALIZE length (129B). */
+    readonly clearSign?: ApduCommandDef;
     /** Get secp256k1 Ethereum public key. Response: uncompressed pubkey(65B). */
     readonly getEthereumPublicKey?: ApduCommandDef;
     /** Sign an EIP-7702 authorization. Response: yParity(1B) + r(32B) + s(32B). */
@@ -88,11 +103,17 @@ export const RAILGUN_PROFILE: ApduProfile = {
     eip7702Authorization: true,
     ethereumTxHash: true,
     ethereumSigning: ['blind', 'clear'],
+    viewingPublicKey: true,
+    railgunAddress: true,
+    railgunClearSign: true,
   },
   commands: {
     getPublicKey: { ins: 0x01, responseLength: 64 },
     sign: { ins: 0x12, responseLength: 129, hasPrefix: true, echoesHash: true },
     getViewingKey: { ins: 0x13, responseLength: 32 },
+    getViewingPublicKey: { ins: 0x10, responseLength: 32 },
+    getRailgunAddress: { ins: 0x14, responseLength: 127 },
+    clearSign: { ins: 0x11, responseLength: 129 },
     getEthereumPublicKey: { ins: 0x07, responseLength: 65 },
     signEip7702Authorization: { ins: 0x08, responseLength: 65 },
     signEthereumTxHash: { ins: 0x09, responseLength: 65 },

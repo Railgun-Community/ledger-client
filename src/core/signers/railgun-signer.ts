@@ -20,6 +20,8 @@ import {
   buildGetPublicKey,
   buildSignHash,
   buildGetViewingKey,
+  buildGetViewingPublicKey,
+  buildGetRailgunAddress,
   buildRailgunEip7702Bip32Path,
   buildRailgunEthereumBip32Path,
   buildGetEthereumPublicKey,
@@ -35,6 +37,8 @@ import {
   parseSignResponse,
   parsePublicKeyResponse,
   parseViewingKeyResponse,
+  parseViewingPublicKeyResponse,
+  parseRailgunAddressResponse,
   extractEchoedHash,
 } from '../../validation/apdu-response.js';
 import { validateSignature } from '../../validation/signature.js';
@@ -89,6 +93,9 @@ function defaultCapabilities(): RailgunAppCapabilities {
     eip7702Authorization: false,
     ethereumTxHash: false,
     ethereumSigning: [],
+    viewingPublicKey: false,
+    railgunAddress: false,
+    railgunClearSign: false,
   };
 }
 
@@ -197,6 +204,38 @@ export class RailgunSigner {
     const spendingPublicKey = await this.getPublicKey();
     const viewingPrivateKey = await this.getViewingKeyBytes();
     return deriveRailgunWalletArtifacts(spendingPublicKey, viewingPrivateKey);
+  }
+
+  /**
+   * Get the compressed Ed25519 viewing *public* key from the device (INS 0x10).
+   * Display/verify accessor — requires an on-device confirmation and does NOT
+   * export the viewing secret. Wallet loading still uses `getWalletArtifacts()`.
+   * @returns 32 raw bytes (compressed Ed25519 point).
+   */
+  async getViewingPublicKey(): Promise<Uint8Array> {
+    this.requireCapability(
+      (capabilities) => capabilities.viewingPublicKey,
+      'RAILGUN app does not advertise viewing-public-key retrieval support.',
+    );
+    const response = await this.transport.send(buildGetViewingPublicKey(this.account, this.profile));
+    validateApduResponse(response);
+    return parseViewingPublicKeyResponse(response.data);
+  }
+
+  /**
+   * Derive and display the canonical `0zk1…` address on the device (INS 0x14).
+   * Device-confirmed cross-check of the host-derived address — requires an
+   * on-device confirmation.
+   * @returns the 127-character `0zk1…` address string.
+   */
+  async getRailgunAddress(): Promise<string> {
+    this.requireCapability(
+      (capabilities) => capabilities.railgunAddress,
+      'RAILGUN app does not advertise RAILGUN-address derivation support.',
+    );
+    const response = await this.transport.send(buildGetRailgunAddress(this.account, this.profile));
+    validateApduResponse(response);
+    return parseRailgunAddressResponse(response.data);
   }
 
   private async getEthereumPublicKeyAtPath(request: RailgunEthereumPreloadRequest, display: boolean): Promise<Uint8Array> {

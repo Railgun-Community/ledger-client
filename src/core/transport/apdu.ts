@@ -135,6 +135,12 @@ export const RailgunAppINS = {
   SIGN_HASH: 0x12,
   /** Get viewing private key. Data: account(4B BE). Response: privkey(32B). */
   GET_VIEWING_KEY: 0x13,
+  /** Get compressed Ed25519 viewing public key. Data: account(4B BE). Response: pubkey(32B). P1=0x01. */
+  GET_VIEWING_PUBLIC_KEY: 0x10,
+  /** CLEAR_SIGN transact review protocol. Stateful; P1 selects the sub-command, P2=0x00. */
+  CLEAR_SIGN: 0x11,
+  /** Derive + display the canonical `0zk1…` address. Data: account(4B BE). Response: 127 ASCII. P1=0x01. */
+  GET_RAILGUN_ADDRESS: 0x14,
 
   // ─── Ethereum / EIP-7702 — matched to current embedded app demo ──────
   // EIP-7702 (SIGN_EIP7702_AUTHORIZATION) is UNDER DEVELOPMENT — see CAPABILITY_STATUS.
@@ -290,6 +296,56 @@ export function buildGetViewingKey(
     cla: profile.cla,
     ins: viewingKey.ins,
     p1: 0,
+    p2: 0,
+    data: encodeAccountIndex(account),
+  };
+}
+
+/**
+ * Build GET_VIEWING_PUBLIC_KEY APDU (VIEWING_PUBKEY, INS 0x10).
+ * Returns the compressed Ed25519 viewing *public* key — 32 bytes.
+ *
+ * P1 is `0x01` (display + confirm): the device shows the account index and
+ * pubkey hex and returns the key only on Approve (Reject → `0x6985`). This is a
+ * display/verify accessor — it does NOT export the viewing secret. Wallet-artifact
+ * derivation still uses `buildGetViewingKey` (the private key, INS 0x13).
+ * @param account - Account index (default 0).
+ * @param profile - APDU profile (default RAILGUN_PROFILE).
+ */
+export function buildGetViewingPublicKey(
+  account = 0,
+  profile: ApduProfile = RAILGUN_PROFILE,
+): ApduCommand {
+  const command = requiredCommand(profile.commands.getViewingPublicKey, profile, 'getViewingPublicKey');
+  return {
+    cla: profile.cla,
+    ins: command.ins,
+    p1: 0x01,
+    p2: 0,
+    data: encodeAccountIndex(account),
+  };
+}
+
+/**
+ * Build GET_RAILGUN_ADDRESS APDU (RAILGUN_ADDRESS, INS 0x14).
+ * Derives and displays the canonical `0zk1…` address — 127 ASCII bytes.
+ *
+ * P1 is `0x01` (display + confirm; always required in prod): the device shows the
+ * same `0zk1…` string for out-of-band comparison and returns it only on Approve
+ * (Reject → `0x6985`). This is a device-confirmed cross-check of the address the
+ * host already derives in `wallet-artifacts.ts`; it does not replace it.
+ * @param account - Account index (default 0).
+ * @param profile - APDU profile (default RAILGUN_PROFILE).
+ */
+export function buildGetRailgunAddress(
+  account = 0,
+  profile: ApduProfile = RAILGUN_PROFILE,
+): ApduCommand {
+  const command = requiredCommand(profile.commands.getRailgunAddress, profile, 'getRailgunAddress');
+  return {
+    cla: profile.cla,
+    ins: command.ins,
+    p1: 0x01,
     p2: 0,
     data: encodeAccountIndex(account),
   };
@@ -533,4 +589,6 @@ export function buildMpcReset(): ApduCommand {
 export const SIGN_RESPONSE_LENGTH = RAILGUN_PROFILE.commands.sign.responseLength;
 export const PUBLIC_KEY_RESPONSE_LENGTH = RAILGUN_PROFILE.commands.getPublicKey.responseLength;
 export const VIEWING_KEY_RESPONSE_LENGTH = RAILGUN_PROFILE.commands.getViewingKey!.responseLength;
+export const VIEWING_PUBLIC_KEY_RESPONSE_LENGTH = RAILGUN_PROFILE.commands.getViewingPublicKey!.responseLength;
+export const RAILGUN_ADDRESS_RESPONSE_LENGTH = RAILGUN_PROFILE.commands.getRailgunAddress!.responseLength;
 export const COMMITMENTS_RESPONSE_LENGTH = 128; // hiding.x(32) + hiding.y(32) + binding.x(32) + binding.y(32)
