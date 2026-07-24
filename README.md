@@ -5,9 +5,10 @@ State-machine-driven hardware wallet connector for RAILGUN — Ledger-first, bro
 ## What It Does
 
 - Connects to Ledger devices via WebHID (browser) or Node HID (scripts/tests)
-- Signs RAILGUN transactions (BabyJubjub EdDSA via custom Ledger app)
+- Signs RAILGUN transactions (BabyJubjub EdDSA via custom Ledger app), with CLEAR_SIGN transact builders (experimental)
+- Reads the viewing public key and the canonical `0zk1…` address for on-device display/verify
 - Signs ETH transactions, messages, EIP-712 typed data, fixed shield ownership markers, and EIP-7702 authorizations
-- Preloads and signs with the RAILGUN app 7702 EOA path `m/7702'/1984'/account'/chainId/ephemeralIndex`
+- Preloads and signs with a caller-customizable, chain-scoped RAILGUN 7702 EOA path `m/7702'/1984'/account'/chainId'/ephemeralIndex'` (a distinct EOA per chain)
 - Installs sideloaded apps via SCP02/SCP03 secure channel
 - Exposes a `HardwareConnector` interface compatible with the RAILGUN engine
 - Drives its behavior through a pure finite state machine — no framework required
@@ -126,13 +127,13 @@ specific app builds.
 
 ## RAILGUN 7702 Hardware Signing (under development)
 
-The SDK exposes the RAILGUN-app hardware path for EIP-7702 signer preload, authorization signing, and RelayAdapt7702 EIP-712 digest signing. The firmware derives Ethereum EOAs from:
+The SDK exposes the RAILGUN-app hardware path for EIP-7702 signer preload, authorization signing, and RelayAdapt7702 EIP-712 digest signing. The firmware derives Ethereum EOAs from a caller-chosen path:
 
 ```text
-m/7702'/1984'/railgunAccountIndex'/chainId/ephemeralIndex
+m/7702'/1984'/account'/chainId'/ephemeralIndex'
 ```
 
-The host sends the trailing three path words to the RAILGUN app as `W0 || W1 || W2`. The app hardens `W0` internally, derives the EOA, and signs against that same suffix for all 7702 operations.
+The host sends the trailing three path words to the RAILGUN app as `W0(account) || W1(chainId) || W2(ephemeralIndex)`; the firmware hardens all three, derives the EOA, and signs against that same suffix for all 7702 operations. All three words are caller-customizable, and because `chainId` is one of them each chain derives a **distinct** EOA (chain-scoped — a wallet runs on many chains at once without reusing a 7702 address). Each word is a hardened index and must fit in 31 bits, so chains with `chainId >= 2**31` are rejected.
 
 | Operation | SDK API | RAILGUN APDU |
 |-----------|---------|--------------|
@@ -196,6 +197,8 @@ All public types and functions are re-exported from `src/index.ts`. Key exports:
 | `createLedgerController` | Headless, framework-agnostic controller |
 | `transition`, `createInitialContext` | Pure FSM for custom integration |
 | `RailgunSigner`, `EthSigner` | Direct signer access |
+| `RailgunSigner.getViewingPublicKey` / `getRailgunAddress` | On-device display/verify of the viewing pubkey (INS 0x10) and `0zk1…` address (INS 0x14) |
+| `buildClearSignInit` … `buildClearSignFinalize`, `validateClearSignShape`, `parseClearSignFinalize` | CLEAR_SIGN transact protocol builders (INS 0x11, experimental) |
 | `RAILGUN_SHIELD_MESSAGE` | Fixed replayable ETH-app ownership marker used by the shield ownership flow |
 | `createEngineLedgerConnector` | Session-aware engine adapter with shield and ETH tx signing hooks |
 | `RailgunSigner.get7702Signer` | Direct engine-compatible 7702 signer from a RAILGUN app signer |
