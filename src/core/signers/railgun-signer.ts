@@ -297,7 +297,7 @@ export class RailgunSigner {
       this,
       {
         railgunWalletID: 'railgun-signer',
-        railgunAccountIndex: this.account,
+        railgunAccountIndex: request.railgunAccountIndex ?? this.account,
         chainId: BigInt(request.chainId),
         ephemeralIndex: request.ephemeralIndex,
       },
