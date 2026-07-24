@@ -3,6 +3,13 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.2.2 — 2026-07-14
+
+### Changed
+
+- The published package now ships the `docs/` directory (added to `package.json` `files`), so the API
+  and usage guides travel with the module. No code changes from 0.2.1.
+
 ## 0.2.1 — 2026-07-14
 
 ### Added
