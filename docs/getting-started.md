@@ -13,7 +13,7 @@ Not on npm yet — install from GitHub, pinned to a tag (see the root README for
 version):
 
 ```bash
-yarn add github:Railgun-Community/ledger-client#v0.3.0
+yarn add github:Railgun-Community/ledger-client#v0.3.1
 ```
 
 Peer deps for browser signing: `@ledgerhq/hw-transport`, `@ledgerhq/hw-transport-webhid`,

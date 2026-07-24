@@ -3,6 +3,15 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.3.1 — 2026-07-24
+
+### Changed
+
+- The published package now ships accurate docs for the 0.3.0 surface: the viewing-public-key
+  (`getViewingPublicKey`, INS 0x10) and RAILGUN-address (`getRailgunAddress`, INS 0x14) accessors,
+  the CLEAR_SIGN transact builders, and the caller-customizable, chain-scoped EIP-7702 path. No code
+  changes from 0.3.0.
+
 ## 0.3.0 — 2026-07-24
 
 Aligns the client with RAILGUN firmware **1.6.1 (clear-sign-v1)**. Requires that build on
