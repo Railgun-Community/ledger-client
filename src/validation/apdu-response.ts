@@ -13,6 +13,8 @@ import type { Signature } from '../core/connector/types.js';
 import {
   PUBLIC_KEY_RESPONSE_LENGTH,
   VIEWING_KEY_RESPONSE_LENGTH,
+  VIEWING_PUBLIC_KEY_RESPONSE_LENGTH,
+  RAILGUN_ADDRESS_RESPONSE_LENGTH,
 } from '../core/transport/apdu.js';
 
 /**
@@ -105,6 +107,47 @@ export function parseViewingKeyResponse(data: Uint8Array): Uint8Array {
   }
   // Return a copy to prevent mutation of the transport buffer
   return data.slice();
+}
+
+/**
+ * Parse a GET_VIEWING_PUBLIC_KEY response (INS 0x10).
+ * Expected: compressed Ed25519 viewing public key (32B). Returns a copy.
+ */
+export function parseViewingPublicKeyResponse(data: Uint8Array): Uint8Array {
+  if (data.length !== VIEWING_PUBLIC_KEY_RESPONSE_LENGTH) {
+    throw new HWError(
+      HWErrorCode.APDU_INVALID_RESPONSE,
+      `Expected ${String(VIEWING_PUBLIC_KEY_RESPONSE_LENGTH)} bytes for viewing public key, got ${String(data.length)}`,
+    );
+  }
+  return data.slice();
+}
+
+/**
+ * Parse a GET_RAILGUN_ADDRESS response (INS 0x14).
+ * Expected: exactly 127 ASCII bytes (a `0zk1…` string, not NUL-terminated).
+ * The device fixes the width, so a non-127 length is a protocol error.
+ */
+export function parseRailgunAddressResponse(data: Uint8Array): string {
+  if (data.length !== RAILGUN_ADDRESS_RESPONSE_LENGTH) {
+    throw new HWError(
+      HWErrorCode.APDU_INVALID_RESPONSE,
+      `Expected ${String(RAILGUN_ADDRESS_RESPONSE_LENGTH)} bytes for RAILGUN address, got ${String(data.length)}`,
+    );
+  }
+  for (const byte of data) {
+    if (byte < 0x20 || byte > 0x7e) {
+      throw new HWError(
+        HWErrorCode.APDU_INVALID_RESPONSE,
+        'RAILGUN address response contains a non-printable-ASCII byte',
+      );
+    }
+  }
+  let address = '';
+  for (const byte of data) {
+    address += String.fromCharCode(byte);
+  }
+  return address;
 }
 
 /**

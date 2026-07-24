@@ -20,4 +20,8 @@ describe('CAPABILITY_STATUS', () => {
     expect(CAPABILITY_STATUS.installer).toBe('experimental');
     expect(CAPABILITY_STATUS.keyAttestation).toBe('experimental');
   });
+
+  it('marks CLEAR_SIGN experimental', () => {
+    expect(CAPABILITY_STATUS.clearSign).toBe('experimental');
+  });
 });

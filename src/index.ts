@@ -143,6 +143,8 @@ export {
   buildGetPublicKey,
   buildSignHash,
   buildGetViewingKey,
+  buildGetViewingPublicKey,
+  buildGetRailgunAddress,
   buildGetEthereumPublicKey,
   buildSignEip7702Authorization,
   buildSignEthereumTxHash,
@@ -156,6 +158,8 @@ export {
   SIGN_RESPONSE_LENGTH,
   PUBLIC_KEY_RESPONSE_LENGTH,
   VIEWING_KEY_RESPONSE_LENGTH,
+  VIEWING_PUBLIC_KEY_RESPONSE_LENGTH,
+  RAILGUN_ADDRESS_RESPONSE_LENGTH,
   COMMITMENTS_RESPONSE_LENGTH,
 } from './core/transport/apdu.js';
 export type { RailgunEthereumPathRequest, EthereumSignatureParts } from './core/transport/apdu.js';
@@ -182,6 +186,8 @@ export {
   parseSignResponse,
   parsePublicKeyResponse,
   parseViewingKeyResponse,
+  parseViewingPublicKeyResponse,
+  parseRailgunAddressResponse,
   extractEchoedHash,
 } from './validation/apdu-response.js';
 
