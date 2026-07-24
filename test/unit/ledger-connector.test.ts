@@ -11,6 +11,15 @@ import type { HardwareConnector, LedgerConnectorConfig } from '../../src/core/co
 import { MockTransport } from '../integration/mock-transport.js';
 import { successResponse } from '../fixtures/apdu-responses.js';
 import { HWError, HWErrorCode } from '../../src/core/errors.js';
+import { encodeErc20TokenHash } from '../../src/core/transport/clear-sign-apdu.js';
+
+/** 129-byte CLEAR_SIGN FINALIZE: 0x60 || R8x(0) || R8y(1) || S(7) || msgHash. */
+function clearSignFinalizeResponse() {
+  const data = new Uint8Array(129);
+  data[0] = 0x60; data[64] = 0x01; data[96] = 0x07;
+  data.set(new Uint8Array(32).fill(0xcd), 97);
+  return successResponse(data);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,6 +111,34 @@ describe('createLedgerConnector', () => {
 
       // Two commands: GET_APP_AND_VERSION + SIGN_HASH
       expect(transport.sentCommands).toHaveLength(2);
+    });
+
+    it('clear-signs when a plaintext transact is passed (toggle), returning outputs', async () => {
+      transport.enqueueResponse(appAndVersionResponse('RAILGUN', '0.1.0')); // ensureAppReady
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // CS_INIT
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // NULLIFIER
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // BP_FIELDS
+      transport.enqueueResponse(successResponse(new Uint8Array(32).fill(0xab))); // OUT_UNSHIELD
+      transport.enqueueResponse(clearSignFinalizeResponse()); // FINALIZE
+
+      const result = await connector.sign(12345n, undefined, undefined, {
+        merkleRoot: new Uint8Array(32).fill(0x11),
+        nullifiers: [new Uint8Array(32).fill(0x22)],
+        boundParams: { treeNumber: 0, minGasPrice: 1n, unshield: true, chainId: 1n },
+        outputs: [{
+          kind: 'unshield',
+          recipientAddress: new Uint8Array(20).fill(0xd8),
+          tokenHash: encodeErc20TokenHash(new Uint8Array(20).fill(0x6b)),
+          value: 0x40000n,
+        }],
+      });
+
+      expect(result.R8[1]).toBe(1n);
+      expect(result.S).toBe(7n);
+      expect(result.clearSign?.msgHash).toEqual(new Uint8Array(32).fill(0xcd));
+      expect(result.clearSign?.outputs).toEqual([{ kind: 'unshield', response: new Uint8Array(32).fill(0xab) }]);
+      // GET_APP_AND_VERSION + 5 clear-sign APDUs
+      expect(transport.sentCommands).toHaveLength(6);
     });
 
     it('throws when no app is open (dashboard)', async () => {

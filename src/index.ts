@@ -8,6 +8,7 @@
 export type {
   HardwareConnector,
   HardwareConnectorSignFn,
+  HardwareConnectorSignResult,
   LedgerConnectorConfig,
   Signature,
   PublicInputsRailgun,

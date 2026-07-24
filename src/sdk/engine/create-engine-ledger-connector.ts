@@ -1,4 +1,4 @@
-import type { RequestApprovalOptions, PublicInputsRailgun, Signature } from '../../core/connector/types.js';
+import type { RequestApprovalOptions, PublicInputsRailgun, HardwareConnectorSignResult } from '../../core/connector/types.js';
 import { HWError, HWErrorCode } from '../../core/errors.js';
 import type { LedgerController } from '../controller/types.js';
 import type {
@@ -31,8 +31,18 @@ function createEngineConnectorMethods(
   controller: LedgerController,
 ): Omit<EngineLedgerConnectorBase, 'type' | 'deviceId'> {
   return {
-    sign: (expectedHash, publicInputs, subSession): Promise<Signature> => {
+    sign: (expectedHash, publicInputs, subSession, clearSign): Promise<HardwareConnectorSignResult> => {
       requirePublicInputs(publicInputs);
+      // Toggle: when a plaintext transact is supplied, clear-sign it (device reviews
+      // recipients/tokens/amounts) and return its outputs; otherwise blind-sign.
+      if (clearSign !== undefined) {
+        return controller
+          .signClearSignTransact(clearSign)
+          .then((result) => ({
+            ...result.signature,
+            clearSign: { msgHash: result.msgHash, outputs: result.outputs },
+          }));
+      }
       return controller.sign(expectedHash, publicInputs, subSession);
     },
     hwSignShield: (derivationIndex) =>

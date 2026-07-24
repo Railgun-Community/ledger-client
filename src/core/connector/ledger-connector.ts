@@ -18,11 +18,12 @@
 import type {
   HardwareConnector,
   HardwareConnectorSignFn,
+  HardwareConnectorSignResult,
   LedgerConnectorConfig,
-  Signature,
   PublicInputsRailgun,
   RequestApprovalOptions,
 } from './types.js';
+import type { ClearSignTransactRequest } from '../transport/clear-sign-apdu.js';
 import type { HWTransport } from '../transport/types.js';
 import { RailgunSigner } from '../signers/railgun-signer.js';
 import { getActiveApp, isVersionSatisfied } from '../device/device-manager.js';
@@ -112,12 +113,19 @@ export function createLedgerConnector(
     expectedHash: bigint,
     publicInputs?: PublicInputsRailgun,
     _subSession?: string,
-  ): Promise<Signature> => {
+    clearSign?: ClearSignTransactRequest,
+  ): Promise<HardwareConnectorSignResult> => {
     return serialized(async () => {
       if (publicInputs !== undefined) {
         await assertExpectedHashMatchesPublicInputs(expectedHash, publicInputs);
       }
       await ensureAppReady();
+      // Toggle: clear-sign the plaintext transact (device reviews it) and return its
+      // outputs; otherwise blind-sign the expected hash.
+      if (clearSign !== undefined) {
+        const result = await withTimeout(signer.signClearSignTransact(clearSign), signTimeout);
+        return { ...result.signature, clearSign: { msgHash: result.msgHash, outputs: result.outputs } };
+      }
       return withTimeout(signer.sign(expectedHash), signTimeout);
     });
   };
