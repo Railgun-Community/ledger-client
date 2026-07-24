@@ -151,6 +151,42 @@ export function parseRailgunAddressResponse(data: Uint8Array): string {
 }
 
 /**
+ * Parse a CLEAR_SIGN single-tx FINALIZE response (INS 0x11, P1 0x40).
+ *
+ * Layout (129 bytes): sig_len(1)=0x60 ‖ R8.x(32) ‖ R8.y(32) ‖ S(32) ‖ msgHash(32).
+ * This is byte-identical to the prefixed SIGN_HASH response, so the signature
+ * and echoed message hash are parsed with the shared helpers; the only extra
+ * check is that the length prefix is 0x60 (3×32).
+ *
+ * @returns the parsed EdDSA signature and the 32-byte message hash the device signed.
+ */
+export function parseClearSignFinalize(
+  data: Uint8Array,
+): { readonly signature: Signature; readonly msgHash: Uint8Array } {
+  if (data.length !== 129) {
+    throw new HWError(
+      HWErrorCode.SIGN_INVALID_RESPONSE,
+      `Expected 129 bytes for CLEAR_SIGN FINALIZE response, got ${String(data.length)}`,
+    );
+  }
+  if (data[0] !== 0x60) {
+    throw new HWError(
+      HWErrorCode.SIGN_INVALID_RESPONSE,
+      `CLEAR_SIGN FINALIZE signature-length prefix must be 0x60, got 0x${(data[0] ?? 0).toString(16)}`,
+    );
+  }
+  const signature = parseSignResponse(data, true);
+  const msgHash = extractEchoedHash(data, true);
+  if (msgHash === null) {
+    throw new HWError(
+      HWErrorCode.SIGN_INVALID_RESPONSE,
+      'CLEAR_SIGN FINALIZE response is missing the echoed message hash',
+    );
+  }
+  return { signature, msgHash };
+}
+
+/**
  * Convert a big-endian Uint8Array to bigint.
  */
 function bytesToBigInt(bytes: Uint8Array): bigint {
