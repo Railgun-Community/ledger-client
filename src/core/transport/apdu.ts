@@ -214,6 +214,11 @@ function assertBytes(value: Uint8Array, length: number, label: string): void {
 /**
  * Build GET_PUBLIC_KEY APDU.
  * Returns the BabyJubjub spending public key (x, y).
+ *
+ * P1 is `0x01` (display + confirm): the RAILGUN app shows the account index and
+ * pubkey hex and returns the 64-byte key only on Approve (Reject → `0x6985`).
+ * Production firmware rejects `P1 = 0x00` (`SW_WRONG_P1P2`), so this always
+ * requires an on-device tap.
  * @param account - Account index (default 0).
  * @param profile - APDU profile (default RAILGUN_PROFILE).
  */
@@ -224,7 +229,7 @@ export function buildGetPublicKey(
   return {
     cla: profile.cla,
     ins: profile.commands.getPublicKey.ins,
-    p1: 0,
+    p1: 0x01,
     p2: 0,
     data: encodeAccountIndex(account),
   };
@@ -262,9 +267,14 @@ export function buildSignHash(
 }
 
 /**
- * Build GET_VIEWING_KEY APDU.
+ * Build GET_VIEWING_KEY APDU (VIEWING_PRIVKEY, INS 0x13).
  * Returns the viewing private key — 32 bytes.
  * Device displays a confirmation prompt.
+ *
+ * P1 stays `0x00` here: unlike the *public* key commands (spending pubkey 0x01,
+ * viewing pubkey 0x10), the viewing-privkey export uses `P1 = 0x00` — the app
+ * already gates it behind an on-device confirmation. `P1 = 0x01` would return
+ * `SW_WRONG_P1P2`.
  * @param account - Account index (default 0).
  * @param profile - APDU profile (default RAILGUN_PROFILE).
  */

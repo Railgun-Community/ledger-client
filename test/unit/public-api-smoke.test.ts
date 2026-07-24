@@ -57,6 +57,8 @@ describe('public API smoke tests', () => {
       const cmd = buildGetPublicKey();
       expect(cmd.cla).toBe(RAILGUN_CLA);
       expect(cmd.ins).toBe(RailgunAppINS.GET_PUBLIC_KEY);
+      // P1 = 0x01 (display + confirm); production firmware rejects P1 = 0x00.
+      expect(cmd.p1).toBe(0x01);
       // Default account 0 → 4 bytes big-endian
       expect(cmd.data).toEqual(new Uint8Array([0, 0, 0, 0]));
     });
@@ -77,6 +79,8 @@ describe('public API smoke tests', () => {
       const cmd = buildGetViewingKey();
       expect(cmd.cla).toBe(RAILGUN_CLA);
       expect(cmd.ins).toBe(RailgunAppINS.GET_VIEWING_KEY);
+      // Viewing-privkey export stays P1 = 0x00 (unlike the public-key commands).
+      expect(cmd.p1).toBe(0x00);
       expect(cmd.data).toEqual(new Uint8Array([0, 0, 0, 0]));
     });
 
