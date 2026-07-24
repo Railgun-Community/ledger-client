@@ -291,6 +291,20 @@ describe('RailgunSigner', () => {
       expect(transport.sentCommands).toHaveLength(0);
     });
 
+    it('rejects EIP-7702 authorization when an explicit path chainId (W1) differs from the auth chainId', async () => {
+      // Explicit path derives the chain-1 EOA (W1=1) but the authorization targets chain 137 —
+      // chain-scoping guard must reject rather than derive one chain and authorize another.
+      await expect(signer.signEip7702Authorization({
+        path: [0x8000_1e16, 0x8000_07c0, 0x8000_0000, 1, 0],
+        chainId: 137n,
+        contractAddress: new Uint8Array(20).fill(0x11),
+        nonce: 7n,
+      })).rejects.toMatchObject({
+        code: HWErrorCode.VALIDATION_DERIVATION_INDEX,
+      });
+      expect(transport.sentCommands).toHaveLength(0);
+    });
+
     it('signs Ethereum tx hashes in gated blind-signing mode', async () => {
       signer = new RailgunSigner({ transport, account: 7 });
       transport.enqueueResponse(ethereumSignatureResponse(0));
