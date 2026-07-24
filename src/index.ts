@@ -186,6 +186,7 @@ export {
   buildClearSignOutUnshield,
   buildClearSignOutput,
   buildClearSignFinalize,
+  buildClearSignInitMultiTx,
 } from './core/transport/clear-sign-apdu.js';
 export type {
   ClearSignInitRequest,
@@ -197,6 +198,8 @@ export type {
   ClearSignOutput,
   ClearSignTransactRequest,
   ClearSignOutputResult,
+  ClearSignSubTransact,
+  ClearSignMultiTransactRequest,
 } from './core/transport/clear-sign-apdu.js';
 
 // ─── Device registry ─────────────────────────────────────────────────────────
@@ -224,6 +227,7 @@ export {
   parseViewingPublicKeyResponse,
   parseRailgunAddressResponse,
   parseClearSignFinalize,
+  parseClearSignFinalizeMulti,
   parseClearSignOutputResponse,
   extractEchoedHash,
 } from './validation/apdu-response.js';
@@ -348,6 +352,7 @@ export type {
   RailgunEthereumAddressResult,
   RailgunSignerConfig,
   ClearSignTransactResult,
+  ClearSignMultiTransactResult,
 } from './core/signers/railgun-signer.js';
 export {
   EthSigner,

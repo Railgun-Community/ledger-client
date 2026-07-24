@@ -363,6 +363,57 @@ export type ClearSignOutputResult = {
   readonly response: Uint8Array;
 };
 
+// ─── Multi-tx (txToken ≠ feeToken) ────────────────────────────────────────────
+
+/** One sub-transaction within a multi-tx CLEAR_SIGN session. */
+export type ClearSignSubTransact = {
+  readonly merkleRoot: Uint8Array;
+  readonly nullifiers: readonly Uint8Array[];
+  readonly boundParams: ClearSignBpFieldsRequest;
+  readonly outputs: readonly ClearSignOutput[];
+};
+
+/**
+ * A multi-tx CLEAR_SIGN transact — the txToken ≠ feeToken case bundles two
+ * sub-transactions (value transfer in token A + broadcaster fee in token B),
+ * each with its own nullifiers / bound-params / outputs, signed together.
+ */
+export type ClearSignMultiTransactRequest = {
+  readonly account?: number;
+  /** 15-byte wallet-source tag; defaults to all-zero. */
+  readonly walletSource?: Uint8Array;
+  /** The sub-transactions (nTx ≥ 2 for the multi flow). */
+  readonly transactions: readonly ClearSignSubTransact[];
+};
+
+/**
+ * CS_INIT multi-tx (P1 0x00):
+ * account(4) ‖ nTx(1) ‖ walletSource(15) ‖ [merkleRoot(32) ‖ nIn(1) ‖ nOut(1)] × nTx.
+ */
+export function buildClearSignInitMultiTx(
+  request: ClearSignMultiTransactRequest,
+  profile: ApduProfile = RAILGUN_PROFILE,
+): ApduCommand {
+  const nTx = request.transactions.length;
+  if (!Number.isInteger(nTx) || nTx < 1 || nTx > 255) {
+    throw new Error(`CLEAR_SIGN multi-tx requires 1..255 transactions, got ${String(nTx)}`);
+  }
+  const walletSource = request.walletSource ?? new Uint8Array(15);
+  assertBytes(walletSource, 15, 'CLEAR_SIGN walletSource');
+  const perTx = request.transactions.map((tx) => {
+    assertBytes(tx.merkleRoot, 32, 'CLEAR_SIGN merkleRoot');
+    validateClearSignShape(tx.nullifiers.length, tx.outputs.length);
+    return concatBytes(tx.merkleRoot, new Uint8Array([tx.nullifiers.length, tx.outputs.length]));
+  });
+  const data = concatBytes(
+    encodeAccountIndex(request.account ?? 0),
+    new Uint8Array([nTx]),
+    walletSource,
+    ...perTx,
+  );
+  return { cla: profile.cla, ins: clearSignIns(profile), p1: ClearSignP1.INIT, p2: 0, data };
+}
+
 function encodeAscii127(value: string): Uint8Array {
   const out = new Uint8Array(127);
   if (value.length !== 127) {

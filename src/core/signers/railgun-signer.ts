@@ -22,8 +22,10 @@ import {
   buildClearSignBpFields,
   buildClearSignOutput,
   buildClearSignFinalize,
+  buildClearSignInitMultiTx,
   validateClearSignShape,
   type ClearSignTransactRequest,
+  type ClearSignMultiTransactRequest,
   type ClearSignOutputResult,
 } from '../transport/clear-sign-apdu.js';
 import {
@@ -51,6 +53,7 @@ import {
   parseViewingPublicKeyResponse,
   parseRailgunAddressResponse,
   parseClearSignFinalize,
+  parseClearSignFinalizeMulti,
   parseClearSignOutputResponse,
   extractEchoedHash,
 } from '../../validation/apdu-response.js';
@@ -159,6 +162,12 @@ export type EthereumTxHashSignOptions = {
 export type ClearSignTransactResult = {
   readonly signature: Signature;
   readonly msgHash: Uint8Array;
+  readonly outputs: readonly ClearSignOutputResult[];
+};
+
+/** Result of a multi-tx CLEAR_SIGN transact: one signature per tx (same key), plus all output responses in order. */
+export type ClearSignMultiTransactResult = {
+  readonly signatures: ReadonlyArray<{ readonly signature: Signature; readonly msgHash: Uint8Array }>;
   readonly outputs: readonly ClearSignOutputResult[];
 };
 
@@ -308,6 +317,55 @@ export class RailgunSigner {
     const { signature, msgHash } = parseClearSignFinalize(finalizeResponse.data);
     validateSignature(signature);
     return { signature, msgHash, outputs };
+  }
+
+  /**
+   * Clear-sign a multi-tx transact (txToken ≠ feeToken). Sends the multi-tx
+   * CS_INIT, then streams each sub-transaction (NULLIFIER×n → BP_FIELDS →
+   * OUT_*×m) in order, and parses the combined FINALIZE into one signature per
+   * transaction (all under the same key). Experimental — see
+   * `CAPABILITY_STATUS.clearSign`.
+   */
+  async signClearSignMultiTransact(request: ClearSignMultiTransactRequest): Promise<ClearSignMultiTransactResult> {
+    this.requireCapability(
+      (capabilities) => capabilities.railgunClearSign,
+      'RAILGUN app does not advertise CLEAR_SIGN transact support.',
+    );
+    const txCount = request.transactions.length;
+    if (txCount < 2) {
+      throw new Error(`CLEAR_SIGN multi-tx requires at least 2 transactions, got ${String(txCount)}. Use signClearSignTransact for a single tx.`);
+    }
+    for (const tx of request.transactions) {
+      validateClearSignShape(tx.nullifiers.length, tx.outputs.length);
+    }
+
+    await this.sendClearSignStep(buildClearSignInitMultiTx(
+      { ...request, account: request.account ?? this.account },
+      this.profile,
+    ));
+
+    const outputs: ClearSignOutputResult[] = [];
+    for (const tx of request.transactions) {
+      for (const nullifier of tx.nullifiers) {
+        await this.sendClearSignStep(buildClearSignNullifier(nullifier, this.profile));
+      }
+      await this.sendClearSignStep(buildClearSignBpFields(tx.boundParams, this.profile));
+      for (const output of tx.outputs) {
+        const { command, responseLength } = buildClearSignOutput(output, this.profile);
+        const response = await this.transport.send(command);
+        validateApduResponse(response);
+        outputs.push({
+          kind: output.kind,
+          response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${output.kind}`),
+        });
+      }
+    }
+
+    const finalizeResponse = await this.transport.send(buildClearSignFinalize(this.profile));
+    validateApduResponse(finalizeResponse);
+    const signatures = parseClearSignFinalizeMulti(finalizeResponse.data, txCount);
+    for (const { signature } of signatures) validateSignature(signature);
+    return { signatures, outputs };
   }
 
   private async getEthereumPublicKeyAtPath(request: RailgunEthereumPreloadRequest, display: boolean): Promise<Uint8Array> {
