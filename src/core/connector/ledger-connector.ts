@@ -23,9 +23,10 @@ import type {
   PublicInputsRailgun,
   RequestApprovalOptions,
 } from './types.js';
-import type { ClearSignTransactRequest } from '../transport/clear-sign-apdu.js';
+import type { ClearSignTransactRequest, ClearSignMultiTransactRequest } from '../transport/clear-sign-apdu.js';
 import type { HWTransport } from '../transport/types.js';
 import { RailgunSigner } from '../signers/railgun-signer.js';
+import type { ClearSignMultiTransactResult } from '../signers/railgun-signer.js';
 import { getActiveApp, isVersionSatisfied } from '../device/device-manager.js';
 import { HWError, HWErrorCode } from '../errors.js';
 import { assertExpectedHashMatchesPublicInputs } from '../../validation/public-inputs.js';
@@ -138,6 +139,15 @@ export function createLedgerConnector(
     return Promise.resolve(true);
   };
 
+  const signClearMultiTransact = (
+    request: ClearSignMultiTransactRequest,
+  ): Promise<ClearSignMultiTransactResult> => {
+    return serialized(async () => {
+      await ensureAppReady();
+      return withTimeout(signer.signClearSignMultiTransact(request), signTimeout);
+    });
+  };
+
   const getPublicKey = async (): Promise<{ readonly x: bigint; readonly y: bigint }> => {
     await ensureAppReady();
     return withTimeout(signer.getPublicKey(), signTimeout);
@@ -155,6 +165,7 @@ export function createLedgerConnector(
     type: 'ledger',
     deviceId: `ledger:${config.appName}`,
     sign,
+    signClearMultiTransact,
     requestBatchApproval,
     getPublicKey,
     isConnected,

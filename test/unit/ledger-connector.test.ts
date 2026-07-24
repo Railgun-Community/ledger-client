@@ -21,6 +21,14 @@ function clearSignFinalizeResponse() {
   return successResponse(data);
 }
 
+/** 256-byte dual-tx FINALIZE: two R8x(0)||R8y(1)||S(7)||msgHash quads. */
+function clearSignFinalize256() {
+  const data = new Uint8Array(256);
+  data[63] = 0x01; data[95] = 0x07; data.set(new Uint8Array(32).fill(0xc0), 96);
+  data[191] = 0x01; data[223] = 0x07; data.set(new Uint8Array(32).fill(0xc1), 224);
+  return successResponse(data);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const CONFIG: LedgerConnectorConfig = {
@@ -139,6 +147,30 @@ describe('createLedgerConnector', () => {
       expect(result.clearSign?.outputs).toEqual([{ kind: 'unshield', response: new Uint8Array(32).fill(0xab) }]);
       // GET_APP_AND_VERSION + 5 clear-sign APDUs
       expect(transport.sentCommands).toHaveLength(6);
+    });
+
+    it('exposes dual-tx clear-sign via signClearMultiTransact (2 signatures)', async () => {
+      const tokenHash = encodeErc20TokenHash(new Uint8Array(20).fill(0x6b));
+      const bp = { treeNumber: 0, minGasPrice: 0n, unshield: false, chainId: 1n } as const;
+      transport.enqueueResponse(appAndVersionResponse('RAILGUN', '0.1.0')); // ensureAppReady
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // CS_INIT (multi)
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx0 NULLIFIER
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx0 BP_FIELDS
+      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x01))); // tx0 OUT_CHANGE
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx1 NULLIFIER
+      transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx1 BP_FIELDS
+      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x02))); // tx1 OUT_CHANGE
+      transport.enqueueResponse(clearSignFinalize256()); // FINALIZE
+
+      const result = await connector.signClearMultiTransact({
+        transactions: [
+          { merkleRoot: new Uint8Array(32).fill(0x11), nullifiers: [new Uint8Array(32).fill(0x33)], boundParams: bp, outputs: [{ kind: 'change', tokenHash, value: 5n }] },
+          { merkleRoot: new Uint8Array(32).fill(0x22), nullifiers: [new Uint8Array(32).fill(0x44)], boundParams: bp, outputs: [{ kind: 'change', tokenHash, value: 9n }] },
+        ],
+      });
+
+      expect(result.signatures.map((s) => s.signature.S)).toEqual([7n, 7n]);
+      expect(result.outputs.map((o) => o.kind)).toEqual(['change', 'change']);
     });
 
     it('throws when no app is open (dashboard)', async () => {

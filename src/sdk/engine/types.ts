@@ -7,6 +7,8 @@ import type { Assert, Equals, Resolve } from '../../core/internal/type-assert.js
 import type { EthSignResult } from '../../core/signers/types.js';
 import type { HwSignShieldResult, ShieldOwnershipMarkerResult } from '../../core/signers/eth-signer.js';
 import type { LedgerBatchApprovalSession } from '../controller/types.js';
+import type { ClearSignMultiTransactRequest } from '../../core/transport/clear-sign-apdu.js';
+import type { ClearSignMultiTransactResult } from '../../core/signers/railgun-signer.js';
 
 export type EngineLedgerSignFn = HardwareConnectorSignFn;
 
@@ -47,6 +49,9 @@ type EngineLedgerConnector_Reference = {
   readonly type: 'ledger';
   readonly deviceId: string;
   sign: EngineLedgerSignFn;
+  signClearMultiTransact: (
+    request: ClearSignMultiTransactRequest,
+  ) => Promise<ClearSignMultiTransactResult>;
   hwSignShield: (derivationIndex: number) => Promise<HwSignShieldResult>;
   signShieldOwnershipMarker?: (
     derivationIndex: number,
@@ -70,6 +75,9 @@ type LegacyEngineLedgerConnector_Reference = {
   readonly type: 'ledger';
   readonly deviceId: string;
   sign: EngineLedgerSignFn;
+  signClearMultiTransact: (
+    request: ClearSignMultiTransactRequest,
+  ) => Promise<ClearSignMultiTransactResult>;
   hwSignShield: (derivationIndex: number) => Promise<HwSignShieldResult>;
   signShieldOwnershipMarker?: (
     derivationIndex: number,

@@ -45,6 +45,7 @@ function createEngineConnectorMethods(
       }
       return controller.sign(expectedHash, publicInputs, subSession);
     },
+    signClearMultiTransact: (request) => controller.signClearSignMultiTransact(request),
     hwSignShield: (derivationIndex) =>
       controller.hwSignShield(derivationIndex),
     ...(controller.signShieldOwnershipMarker === undefined

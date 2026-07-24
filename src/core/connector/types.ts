@@ -1,6 +1,7 @@
 import type { ApduProfile } from '../transport/apdu-profile.js';
 import type { Assert, Equals, Resolve } from '../internal/type-assert.js';
-import type { ClearSignTransactRequest, ClearSignOutputResult } from '../transport/clear-sign-apdu.js';
+import type { ClearSignTransactRequest, ClearSignOutputResult, ClearSignMultiTransactRequest } from '../transport/clear-sign-apdu.js';
+import type { ClearSignMultiTransactResult } from '../signers/railgun-signer.js';
 
 /**
  * RAILGUN engine-facing connector types.
@@ -99,6 +100,15 @@ export type CommonConnectorBase = {
   /** Sign a poseidon hash, returning a BabyJubjub EdDSA signature. */
   sign: HardwareConnectorSignFn;
 
+  /**
+   * Clear-sign a multi-tx transact (txToken != feeToken → one signature per tx).
+   * The single-tx case is the `clearSign` toggle on `sign`; this covers the
+   * two-signature case that doesn't fit a single-signature return. Experimental.
+   */
+  signClearMultiTransact: (
+    request: ClearSignMultiTransactRequest,
+  ) => Promise<ClearSignMultiTransactResult>;
+
   /** Get the BabyJubjub public key from the device. */
   getPublicKey: () => Promise<{ readonly x: bigint; readonly y: bigint }>;
 
@@ -133,6 +143,9 @@ type HardwareConnector_Reference = {
   readonly type: 'ledger';
   readonly deviceId: string;
   sign: HardwareConnectorSignFn;
+  signClearMultiTransact: (
+    request: ClearSignMultiTransactRequest,
+  ) => Promise<ClearSignMultiTransactResult>;
   requestBatchApproval: (
     requests: readonly RequestApprovalOptions[],
   ) => Promise<boolean>;
