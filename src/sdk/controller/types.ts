@@ -12,7 +12,13 @@ import type { EthereumSignatureParts } from '../../core/transport/apdu.js';
 import type {
   RailgunEthereumPreloadRequest,
   RailgunEthereumSignerSession,
+  ClearSignTransactResult,
+  ClearSignMultiTransactResult,
 } from '../../core/signers/railgun-signer.js';
+import type {
+  ClearSignTransactRequest,
+  ClearSignMultiTransactRequest,
+} from '../../core/transport/clear-sign-apdu.js';
 import type { RailgunWalletArtifacts } from '../../core/wallet-artifacts.js';
 import type { AppRequirement } from '../../core/device/types.js';
 import type { HWError } from '../../core/errors.js';
@@ -96,6 +102,14 @@ export interface LedgerController {
       readonly nonce: bigint;
     },
   ): Promise<EthereumSignatureParts>;
+  /** Clear-sign a RAILGUN transact (INS 0x11) — the device reviews the recipients/tokens/amounts. Experimental. */
+  signClearSignTransact(
+    request: ClearSignTransactRequest,
+  ): Promise<ClearSignTransactResult>;
+  /** Clear-sign a multi-tx transact (txToken != feeToken → one signature per tx). Experimental. */
+  signClearSignMultiTransact(
+    request: ClearSignMultiTransactRequest,
+  ): Promise<ClearSignMultiTransactResult>;
   sign(
     expectedHash: bigint,
     publicInputs?: PublicInputsRailgun,

@@ -284,9 +284,10 @@ export function buildSignHash(
  * Device displays a confirmation prompt.
  *
  * P1 stays `0x00` here: unlike the *public* key commands (spending pubkey 0x01,
- * viewing pubkey 0x10), the viewing-privkey export uses `P1 = 0x00` — the app
- * already gates it behind an on-device confirmation. `P1 = 0x01` would return
- * `SW_WRONG_P1P2`.
+ * viewing pubkey 0x10) which require `P1 = 0x01`, the viewing-privkey export is
+ * already gated behind its own on-device confirmation and does not vary on P1 —
+ * device testing shows INS 0x13 ignores P1 (returns the key for both 0x00 and
+ * 0x01). We send `0x00`.
  * @param account - Account index (default 0).
  * @param profile - APDU profile (default RAILGUN_PROFILE).
  */
