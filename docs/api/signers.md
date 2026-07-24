@@ -50,6 +50,22 @@ value so the user can compare it against an out-of-band source). Neither exposes
 | `getViewingPublicKey()` | `Uint8Array` (32B) | Compressed Ed25519 viewing **public** key (`INS 0x10`). Display/verify only — does **not** export the viewing secret; wallet loading still uses `getWalletArtifacts()`. |
 | `getRailgunAddress()` | `string` | The canonical 127-char `0zk1…` address (`INS 0x14`) — a device-confirmed cross-check of the host-derived address. |
 
+### CLEAR_SIGN transact (experimental)
+
+`signClearSignTransact(request)` clear-signs a RAILGUN transact via `INS 0x11`: the device
+displays the actual recipients / tokens / amounts (not just a hash) and signs on approval. It
+streams the session in order (init → nullifiers → bound-params → outputs → finalize) and returns
+the EdDSA signature, the echoed message hash, and the raw per-output device responses.
+
+| Method | Purpose |
+|--------|---------|
+| `signClearSignTransact(request)` | Clear-sign a single transact (n inputs, m outputs; `n,m ≤ 3`, `n+m ≤ 5`). |
+| `signClearSignMultiTransact(request)` | Clear-sign a multi-tx bundle (`txToken ≠ feeToken` → one signature per tx). |
+
+Both are also exposed on [`LedgerController`](./controller.md) (managed lifecycle). Splicing the
+returned output responses into the on-chain transact calldata (full engine integration) is not
+included.
+
 ### Ethereum / EIP-7702 methods (under development)
 
 The RAILGUN app derives Ethereum EOAs from a **caller-chosen** path
