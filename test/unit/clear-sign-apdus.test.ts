@@ -20,6 +20,7 @@ import {
   buildClearSignOutTransfer,
   buildClearSignOutUnshield,
   buildClearSignFinalize,
+  decodeClearSignOutput,
 } from '../../src/core/transport/clear-sign-apdu.js';
 import { parseClearSignFinalize } from '../../src/validation/apdu-response.js';
 import { serializeApdu } from '../../src/core/transport/apdu-wire.js';
@@ -222,5 +223,50 @@ describe('parseClearSignFinalize', () => {
     const bad = finalize129();
     bad[0] = 0x40;
     expect(() => parseClearSignFinalize(bad)).toThrow(/0x60/);
+  });
+});
+
+describe('decodeClearSignOutput', () => {
+  const fill = (n: number, v: number): Uint8Array => new Uint8Array(n).fill(v);
+  const concat = (...parts: Uint8Array[]): Uint8Array => {
+    const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+    let off = 0;
+    for (const p of parts) { out.set(p, off); off += p.length; }
+    return out;
+  };
+  // 208-byte tuple: random(16) Blind1(32) Blind2(32) IV(16) tag(16) ciphertext(96)
+  const tuple = concat(fill(16, 0x01), fill(32, 0x02), fill(32, 0x03), fill(16, 0x04), fill(16, 0x05), fill(96, 0x06));
+
+  it('decodes a broadcaster/change tuple (223B) at the reference offsets', () => {
+    const d = decodeClearSignOutput({ kind: 'broadcaster', response: concat(tuple, fill(15, 0x07)) });
+    expect(d.kind).toBe('broadcaster');
+    if (d.kind === 'unshield') throw new Error('unexpected');
+    expect(d.random).toEqual(fill(16, 0x01));
+    expect(d.senderBlindingKey).toEqual(fill(32, 0x02));
+    expect(d.recipientBlindingKey).toEqual(fill(32, 0x03));
+    expect(d.iv).toEqual(fill(16, 0x04));
+    expect(d.tag).toEqual(fill(16, 0x05));
+    expect(d.ciphertext).toEqual(fill(96, 0x06));
+    expect(d.senderRandom).toEqual(fill(15, 0x07));
+    expect(d.annotationIv).toBeUndefined();
+  });
+
+  it('decodes a transfer tuple (239B) with the annotation IV', () => {
+    const d = decodeClearSignOutput({ kind: 'transfer', response: concat(tuple, fill(15, 0x07), fill(16, 0x08)) });
+    if (d.kind === 'unshield') throw new Error('unexpected');
+    expect(d.senderRandom).toEqual(fill(15, 0x07));
+    expect(d.annotationIv).toEqual(fill(16, 0x08));
+  });
+
+  it('decodes an unshield commitment (32B)', () => {
+    const d = decodeClearSignOutput({ kind: 'unshield', response: fill(32, 0x09) });
+    expect(d.kind).toBe('unshield');
+    if (d.kind !== 'unshield') throw new Error('unexpected');
+    expect(d.commitment).toEqual(fill(32, 0x09));
+  });
+
+  it('rejects a wrong-length response', () => {
+    expect(() => decodeClearSignOutput({ kind: 'broadcaster', response: fill(222, 0) })).toThrow();
+    expect(() => decodeClearSignOutput({ kind: 'unshield', response: fill(33, 0) })).toThrow();
   });
 });

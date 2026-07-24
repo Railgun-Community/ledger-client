@@ -191,6 +191,7 @@ export {
   buildClearSignOutput,
   buildClearSignFinalize,
   buildClearSignInitMultiTx,
+  decodeClearSignOutput,
 } from './core/transport/clear-sign-apdu.js';
 export type {
   ClearSignInitRequest,
@@ -204,6 +205,8 @@ export type {
   ClearSignOutputResult,
   ClearSignSubTransact,
   ClearSignMultiTransactRequest,
+  ClearSignDecodedTuple,
+  ClearSignDecodedOutput,
 } from './core/transport/clear-sign-apdu.js';
 
 // ─── Device registry ─────────────────────────────────────────────────────────

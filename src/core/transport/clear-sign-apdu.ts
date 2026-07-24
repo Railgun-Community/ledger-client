@@ -363,6 +363,57 @@ export type ClearSignOutputResult = {
   readonly response: Uint8Array;
 };
 
+/** Structured decode of a broadcaster/change/transfer OUT_* response (the 208-byte tuple + trailers). */
+export type ClearSignDecodedTuple = {
+  readonly random: Uint8Array; // 16
+  /** Blind1 — sender blinding key (32). */
+  readonly senderBlindingKey: Uint8Array;
+  /** Blind2 — recipient blinding key (32). */
+  readonly recipientBlindingKey: Uint8Array;
+  readonly iv: Uint8Array; // 16
+  readonly tag: Uint8Array; // 16
+  readonly ciphertext: Uint8Array; // 96
+  readonly senderRandom: Uint8Array; // 15
+  /** Present only for OUT_TRANSFER (16). */
+  readonly annotationIv?: Uint8Array;
+};
+
+/** A decoded OUT_* response: a note tuple, or an unshield commitment. */
+export type ClearSignDecodedOutput =
+  | ({ readonly kind: 'broadcaster' | 'change' | 'transfer' } & ClearSignDecodedTuple)
+  | { readonly kind: 'unshield'; readonly commitment: Uint8Array };
+
+/**
+ * Decode a raw OUT_* device response into its structured fields, using the byte
+ * layout the firmware author's reference (`clear-sign-apdus.js`) documents:
+ *   tuple(208) = random(16) ‖ Blind1(32) ‖ Blind2(32) ‖ IV(16) ‖ tag(16) ‖ ciphertext(96)
+ *   + senderRandom(15)  [+ annotationIv(16) for transfer];  unshield = commitment(32).
+ * These fields are what the RAILGUN engine assembles into the on-chain transact
+ * calldata (that assembly is protocol/ABI-specific and lives in the engine).
+ */
+export function decodeClearSignOutput(result: ClearSignOutputResult): ClearSignDecodedOutput {
+  const { kind, response } = result;
+  if (kind === 'unshield') {
+    assertBytes(response, CLEAR_SIGN_UNSHIELD_RESPONSE_LENGTH, 'OUT_UNSHIELD response');
+    return { kind, commitment: response.slice() };
+  }
+  const expected = kind === 'transfer'
+    ? CLEAR_SIGN_TRANSFER_RESPONSE_LENGTH
+    : CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH;
+  assertBytes(response, expected, `OUT_${kind} response`);
+  const tuple = {
+    kind,
+    random: response.slice(0, 16),
+    senderBlindingKey: response.slice(16, 48),
+    recipientBlindingKey: response.slice(48, 80),
+    iv: response.slice(80, 96),
+    tag: response.slice(96, 112),
+    ciphertext: response.slice(112, 208),
+    senderRandom: response.slice(208, 223),
+  } as const;
+  return kind === 'transfer' ? { ...tuple, annotationIv: response.slice(223, 239) } : tuple;
+}
+
 // ─── Multi-tx (txToken ≠ feeToken) ────────────────────────────────────────────
 
 /** One sub-transaction within a multi-tx CLEAR_SIGN session. */
