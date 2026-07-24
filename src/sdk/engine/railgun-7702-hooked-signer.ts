@@ -60,7 +60,7 @@ export type RailgunRelayAdapt7702HookedSigner = {
 export type Railgun7702Signer = RailgunRelayAdapt7702HookedSigner;
 
 export type Railgun7702SignerRequest = {
-  /** Path word W1 — chain-scopes the EOA (a distinct address per chain). */
+  /** Path word W1 — chain-scopes the EOA (a distinct address per chain). Must fit in 31 bits (chains >= 2**31 unsupported). */
   readonly chainId: number | bigint | string;
   /** Path word W2 — the ephemeral/rotating index within an (account, chain). */
   readonly ephemeralIndex: number;
