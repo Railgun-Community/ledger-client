@@ -41,6 +41,12 @@ export const StatusWord = {
   LOCKED_DEVICE: 0x5515,
   /** BOLOS: returned by OPEN_APP when the requested application is not installed. */
   APP_NOT_FOUND: 0x6807,
+  /**
+   * RAILGUN-app-specific: observed on CLEAR_SIGN sub-commands sent out of order or
+   * without an active session (device probe, 2026-07-24). Best-effort — the exact
+   * meaning is not documented; confirm with the firmware author.
+   */
+  RAILGUN_CLEAR_SIGN_STATE: 0xb007,
 } as const;
 
 export type StatusWord = (typeof StatusWord)[keyof typeof StatusWord];

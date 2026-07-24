@@ -21,6 +21,12 @@ export function statusWordToHWError(statusWord: number): HWError {
       return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Device is locked. Unlock and retry.');
     case StatusWord.APP_NOT_OPEN:
       return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Required app is not open on the device.');
+    case StatusWord.RAILGUN_CLEAR_SIGN_STATE:
+      // Best-effort — exact meaning unconfirmed with the firmware author.
+      return new HWError(
+        HWErrorCode.APDU_STATUS_ERROR,
+        'RAILGUN CLEAR_SIGN session/state error (SW 0xb007) — a sub-command was likely sent out of order or without an active session.',
+      );
     default:
       return new HWError(
         HWErrorCode.APDU_STATUS_ERROR,
