@@ -165,13 +165,16 @@ export {
 export type { RailgunEthereumPathRequest, EthereumSignatureParts } from './core/transport/apdu.js';
 
 // ─── CLEAR_SIGN transact protocol (INS 0x11) — EXPERIMENTAL (firmware 1.6.1) ──
-// Pure APDU builders + shape validator for the stateful clear-sign session.
-// Session orchestration and engine wiring are not yet wired up; see CAPABILITY_STATUS.clearSign.
+// Pure APDU builders + shape validator + the RailgunSigner.signClearSignTransact orchestrator.
+// Engine wiring is not yet wired up; see CAPABILITY_STATUS.clearSign.
 export {
   ClearSignP1,
   CLEAR_SIGN_MAX_MEMO_LEN,
   CLEAR_SIGN_MIN_GAS_PRICE_MAX,
   CLEAR_SIGN_OUTPUT_TYPE_TRANSFER,
+  CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH,
+  CLEAR_SIGN_TRANSFER_RESPONSE_LENGTH,
+  CLEAR_SIGN_UNSHIELD_RESPONSE_LENGTH,
   encodeErc20TokenHash,
   validateClearSignShape,
   buildClearSignInit,
@@ -181,6 +184,7 @@ export {
   buildClearSignOutChange,
   buildClearSignOutTransfer,
   buildClearSignOutUnshield,
+  buildClearSignOutput,
   buildClearSignFinalize,
 } from './core/transport/clear-sign-apdu.js';
 export type {
@@ -190,6 +194,9 @@ export type {
   ClearSignChangeOutput,
   ClearSignTransferOutput,
   ClearSignUnshieldOutput,
+  ClearSignOutput,
+  ClearSignTransactRequest,
+  ClearSignOutputResult,
 } from './core/transport/clear-sign-apdu.js';
 
 // ─── Device registry ─────────────────────────────────────────────────────────
@@ -217,6 +224,7 @@ export {
   parseViewingPublicKeyResponse,
   parseRailgunAddressResponse,
   parseClearSignFinalize,
+  parseClearSignOutputResponse,
   extractEchoedHash,
 } from './validation/apdu-response.js';
 
@@ -339,6 +347,7 @@ export type {
   RailgunEthereumSignerSession,
   RailgunEthereumAddressResult,
   RailgunSignerConfig,
+  ClearSignTransactResult,
 } from './core/signers/railgun-signer.js';
 export {
   EthSigner,

@@ -12,10 +12,20 @@
  * connecting/disconnecting.
  */
 
-import type { HWTransport } from '../transport/types.js';
+import type { HWTransport, ApduCommand } from '../transport/types.js';
 import type { Signature } from '../connector/types.js';
 import type { ApduProfile, RailgunAppCapabilities } from '../transport/apdu-profile.js';
 import { RAILGUN_PROFILE } from '../transport/apdu-profile.js';
+import {
+  buildClearSignInit,
+  buildClearSignNullifier,
+  buildClearSignBpFields,
+  buildClearSignOutput,
+  buildClearSignFinalize,
+  validateClearSignShape,
+  type ClearSignTransactRequest,
+  type ClearSignOutputResult,
+} from '../transport/clear-sign-apdu.js';
 import {
   buildGetPublicKey,
   buildSignHash,
@@ -40,6 +50,8 @@ import {
   parseViewingKeyResponse,
   parseViewingPublicKeyResponse,
   parseRailgunAddressResponse,
+  parseClearSignFinalize,
+  parseClearSignOutputResponse,
   extractEchoedHash,
 } from '../../validation/apdu-response.js';
 import { validateSignature } from '../../validation/signature.js';
@@ -143,6 +155,13 @@ export type EthereumTxHashSignOptions = {
   readonly allowBlind?: boolean;
 };
 
+/** Result of a CLEAR_SIGN transact: the EdDSA signature, the echoed message hash, and the raw per-output responses. */
+export type ClearSignTransactResult = {
+  readonly signature: Signature;
+  readonly msgHash: Uint8Array;
+  readonly outputs: readonly ClearSignOutputResult[];
+};
+
 /**
  * RAILGUN signer — sends custom APDU commands to the RAILGUN Ledger app.
  *
@@ -237,6 +256,58 @@ export class RailgunSigner {
     const response = await this.transport.send(buildGetRailgunAddress(this.account, this.profile));
     validateApduResponse(response);
     return parseRailgunAddressResponse(response.data);
+  }
+
+  private async sendClearSignStep(command: ApduCommand): Promise<void> {
+    const response = await this.transport.send(command);
+    validateApduResponse(response);
+  }
+
+  /**
+   * Clear-sign a RAILGUN transact (INS 0x11). Streams the session in order —
+   * CS_INIT → NULLIFIER×n → BP_FIELDS → OUT_*×m → FINALIZE — collecting each
+   * output's opaque device response, then parses the FINALIZE signature. The
+   * device shows the actual recipients/tokens/amounts and signs on approval.
+   *
+   * Returns the EdDSA signature, the echoed message hash, and the raw per-output
+   * responses (which the caller splices into the on-chain transact calldata).
+   * Experimental — see `CAPABILITY_STATUS.clearSign`.
+   */
+  async signClearSignTransact(request: ClearSignTransactRequest): Promise<ClearSignTransactResult> {
+    this.requireCapability(
+      (capabilities) => capabilities.railgunClearSign,
+      'RAILGUN app does not advertise CLEAR_SIGN transact support.',
+    );
+    const nIn = request.nullifiers.length;
+    const nOut = request.outputs.length;
+    validateClearSignShape(nIn, nOut);
+
+    const account = request.account ?? this.account;
+    await this.sendClearSignStep(buildClearSignInit(
+      { account, merkleRoot: request.merkleRoot, nIn, nOut },
+      this.profile,
+    ));
+    for (const nullifier of request.nullifiers) {
+      await this.sendClearSignStep(buildClearSignNullifier(nullifier, this.profile));
+    }
+    await this.sendClearSignStep(buildClearSignBpFields(request.boundParams, this.profile));
+
+    const outputs: ClearSignOutputResult[] = [];
+    for (const output of request.outputs) {
+      const { command, responseLength } = buildClearSignOutput(output, this.profile);
+      const response = await this.transport.send(command);
+      validateApduResponse(response);
+      outputs.push({
+        kind: output.kind,
+        response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${output.kind}`),
+      });
+    }
+
+    const finalizeResponse = await this.transport.send(buildClearSignFinalize(this.profile));
+    validateApduResponse(finalizeResponse);
+    const { signature, msgHash } = parseClearSignFinalize(finalizeResponse.data);
+    validateSignature(signature);
+    return { signature, msgHash, outputs };
   }
 
   private async getEthereumPublicKeyAtPath(request: RailgunEthereumPreloadRequest, display: boolean): Promise<Uint8Array> {

@@ -187,6 +187,25 @@ export function parseClearSignFinalize(
 }
 
 /**
+ * Length-check a streamed CLEAR_SIGN OUT_* response and return a copy of the raw
+ * bytes — opaque ciphertext material the host later splices into the on-chain
+ * transact calldata. Device response lengths are fixed per output kind.
+ */
+export function parseClearSignOutputResponse(
+  data: Uint8Array,
+  expectedLength: number,
+  label: string,
+): Uint8Array {
+  if (data.length !== expectedLength) {
+    throw new HWError(
+      HWErrorCode.APDU_INVALID_RESPONSE,
+      `Expected ${String(expectedLength)} bytes for CLEAR_SIGN ${label} response, got ${String(data.length)}`,
+    );
+  }
+  return data.slice();
+}
+
+/**
  * Convert a big-endian Uint8Array to bigint.
  */
 function bytesToBigInt(bytes: Uint8Array): bigint {

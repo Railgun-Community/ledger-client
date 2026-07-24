@@ -44,6 +44,15 @@ export const CLEAR_SIGN_MIN_GAS_PRICE_MAX = 1n << 48n;
 /** Transfer output type — 0 = Transfer. */
 export const CLEAR_SIGN_OUTPUT_TYPE_TRANSFER = 0;
 
+/**
+ * Per-output device response lengths, measured on firmware 1.6.1 clear-sign-v1.
+ * The device returns opaque ciphertext material the host later splices into the
+ * on-chain transact calldata; the orchestrator length-checks and collects it raw.
+ */
+export const CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH = 223; // OUT_BROADCASTER / OUT_CHANGE
+export const CLEAR_SIGN_TRANSFER_RESPONSE_LENGTH = 239; // OUT_TRANSFER (tuple + senderRandom + ann_iv)
+export const CLEAR_SIGN_UNSHIELD_RESPONSE_LENGTH = 32; // OUT_UNSHIELD commitment
+
 // ─── Encoding helpers ─────────────────────────────────────────────────────────
 
 function encodeUintBE(value: bigint, byteLength: number, label: string): Uint8Array {
@@ -305,6 +314,54 @@ export function buildClearSignOutUnshield(
 export function buildClearSignFinalize(profile: ApduProfile = RAILGUN_PROFILE): ApduCommand {
   return { cla: profile.cla, ins: clearSignIns(profile), p1: ClearSignP1.FINALIZE, p2: 0, data: new Uint8Array([0]) };
 }
+
+// ─── Session orchestration surface ────────────────────────────────────────────
+
+/** A transact output, tagged so the orchestrator can pick the right OUT_* sub-command. */
+export type ClearSignOutput =
+  | ({ readonly kind: 'broadcaster' } & ClearSignBroadcasterOutput)
+  | ({ readonly kind: 'change' } & ClearSignChangeOutput)
+  | ({ readonly kind: 'transfer' } & ClearSignTransferOutput)
+  | ({ readonly kind: 'unshield' } & ClearSignUnshieldOutput);
+
+/**
+ * Build the OUT_* APDU for a tagged output and report the exact device response
+ * length to expect, so the session orchestrator can length-check each reply.
+ */
+export function buildClearSignOutput(
+  output: ClearSignOutput,
+  profile: ApduProfile = RAILGUN_PROFILE,
+): { readonly command: ApduCommand; readonly responseLength: number } {
+  switch (output.kind) {
+    case 'broadcaster':
+      return { command: buildClearSignOutBroadcaster(output, profile), responseLength: CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH };
+    case 'change':
+      return { command: buildClearSignOutChange(output, profile), responseLength: CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH };
+    case 'transfer':
+      return { command: buildClearSignOutTransfer(output, profile), responseLength: CLEAR_SIGN_TRANSFER_RESPONSE_LENGTH };
+    case 'unshield':
+      return { command: buildClearSignOutUnshield(output, profile), responseLength: CLEAR_SIGN_UNSHIELD_RESPONSE_LENGTH };
+  }
+}
+
+/** A single-tx CLEAR_SIGN transact to sign (n inputs, m outputs). */
+export type ClearSignTransactRequest = {
+  readonly account?: number;
+  /** 32-byte merkle root. */
+  readonly merkleRoot: Uint8Array;
+  /** One 32-byte nullifier per input (1..3). */
+  readonly nullifiers: readonly Uint8Array[];
+  /** Bound-params fields (tree, minGasPrice, unshield, chainID, adapt*). */
+  readonly boundParams: ClearSignBpFieldsRequest;
+  /** Outputs (1..3), sent in array order. */
+  readonly outputs: readonly ClearSignOutput[];
+};
+
+/** The raw device response for one streamed output (opaque ciphertext material). */
+export type ClearSignOutputResult = {
+  readonly kind: ClearSignOutput['kind'];
+  readonly response: Uint8Array;
+};
 
 function encodeAscii127(value: string): Uint8Array {
   const out = new Uint8Array(127);
