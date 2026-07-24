@@ -243,6 +243,34 @@ describe('RailgunSigner', () => {
       expect(Buffer.from(transport.sentCommands[1]?.data?.slice(0, 12) ?? new Uint8Array()).toString('hex')).toBe('000000020000a4b100000007');
     });
 
+    it('honors a custom railgunAccountIndex in get7702Signer (override wins over this.account)', async () => {
+      // Signer account is 2, but the request overrides W0 to 5 — the derivation
+      // and the authorization must both use account 5, not the signer's 2.
+      signer = new RailgunSigner({ transport, account: 2 });
+      const publicKey = new Uint8Array(Buffer.from(
+        '0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+        + '483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8',
+        'hex',
+      ));
+      transport.enqueueResponse(successResponse(publicKey));
+      transport.enqueueResponse(ethereumSignatureResponse(1));
+
+      const railgun7702Signer = await signer.get7702Signer({
+        chainId: '42161',
+        ephemeralIndex: 7,
+        railgunAccountIndex: 5,
+      });
+      await railgun7702Signer.authorize({
+        address: '0x1111111111111111111111111111111111111111',
+        chainId: 42161n,
+        nonce: '9',
+      });
+
+      // W0 must be the override (5), NOT the signer's account (2).
+      expect(Buffer.from(transport.sentCommands[0]?.data ?? new Uint8Array()).toString('hex')).toBe('000000050000a4b100000007');
+      expect(Buffer.from(transport.sentCommands[1]?.data?.slice(0, 12) ?? new Uint8Array()).toString('hex')).toBe('000000050000a4b100000007');
+    });
+
     it('rejects EIP-7702 authorization when the prepared session chain differs', async () => {
       await expect(signer.signEip7702Authorization({
         session: {
@@ -254,6 +282,20 @@ describe('RailgunSigner', () => {
           publicKey: `0x${'00'.repeat(65)}`,
           capabilities: RAILGUN_PROFILE.capabilities,
         },
+        chainId: 137n,
+        contractAddress: new Uint8Array(20).fill(0x11),
+        nonce: 7n,
+      })).rejects.toMatchObject({
+        code: HWErrorCode.VALIDATION_DERIVATION_INDEX,
+      });
+      expect(transport.sentCommands).toHaveLength(0);
+    });
+
+    it('rejects EIP-7702 authorization when an explicit path chainId (W1) differs from the auth chainId', async () => {
+      // Explicit path derives the chain-1 EOA (W1=1) but the authorization targets chain 137 —
+      // chain-scoping guard must reject rather than derive one chain and authorize another.
+      await expect(signer.signEip7702Authorization({
+        path: [0x8000_1e16, 0x8000_07c0, 0x8000_0000, 1, 0],
         chainId: 137n,
         contractAddress: new Uint8Array(20).fill(0x11),
         nonce: 7n,

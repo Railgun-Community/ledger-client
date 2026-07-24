@@ -53,10 +53,16 @@ export const RAILGUN_EIP7702_BIP32_PATH = [
 ] as const;
 
 export type RailgunEthereumPathRequest = {
+  /** Account index — path word W0 (must fit in 31 bits). */
   readonly railgunAccountIndex: number;
-  /** Chain/domain path suffix used by the firmware for the 7702 EOA. */
+  /**
+   * Chain id — path word W1; chain-scopes the derived 7702 EOA (a distinct
+   * address per chain). Each path word is a hardened BIP-32 index, so this must
+   * fit in 31 bits: EVM chains with `chainId >= 2**31` are not supported and are
+   * rejected (fail-closed — never silently collapsed onto another chain's slot).
+   */
   readonly chainId: number | bigint;
-  /** Ephemeral path suffix used by the firmware for the 7702 EOA. */
+  /** Ephemeral/rotating index within an (account, chain) — path word W2 (must fit in 31 bits). */
   readonly ephemeralIndex: number;
 };
 

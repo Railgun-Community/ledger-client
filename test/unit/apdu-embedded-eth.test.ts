@@ -7,6 +7,7 @@ import {
   buildSignEip7702Authorization,
   buildSignEthereumTxHash,
   encodeBip32Path,
+  encodeRailgunEthereumPathSuffix,
   parseEthereumSignatureResponse,
 } from '../../src/core/transport/apdu.js';
 
@@ -47,6 +48,19 @@ describe('embedded Ethereum APDUs', () => {
     })))).toBe(
       '0580001e16800007c0800000020000a4b100000007',
     );
+  });
+
+  it('derives a distinct chain-scoped 7702 path per chain (multi-chain, all words customizable)', () => {
+    // chainId is path word W1, so each chain yields a different EOA slot — a wallet
+    // can run on many chains at once without reusing the same 7702 address.
+    const eth = hex(encodeRailgunEthereumPathSuffix({ railgunAccountIndex: 0, chainId: 1n, ephemeralIndex: 0 }));
+    const arb = hex(encodeRailgunEthereumPathSuffix({ railgunAccountIndex: 0, chainId: 42161n, ephemeralIndex: 0 }));
+    expect(eth).toBe('00000000' + '00000001' + '00000000'); // W0=account 0, W1=chainId 1, W2=index 0
+    expect(arb).toBe('00000000' + '0000a4b1' + '00000000'); // W1=chainId 42161
+    expect(eth).not.toBe(arb);
+    // account (W0) and ephemeralIndex (W2) are independent, caller-customizable axes:
+    expect(hex(encodeRailgunEthereumPathSuffix({ railgunAccountIndex: 2, chainId: 1n, ephemeralIndex: 5 })))
+      .toBe('00000002' + '00000001' + '00000005');
   });
 
   it('rejects path indexes that would collide with hardened components', () => {

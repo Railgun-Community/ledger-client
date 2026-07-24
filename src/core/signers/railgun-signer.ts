@@ -24,6 +24,7 @@ import {
   buildGetRailgunAddress,
   buildRailgunEip7702Bip32Path,
   buildRailgunEthereumBip32Path,
+  encodeRailgunEthereumPathSuffixFromBip32Path,
   buildGetEthereumPublicKey,
   buildSignEip7702Authorization,
   buildSignEthereumTxHash,
@@ -297,7 +298,7 @@ export class RailgunSigner {
       this,
       {
         railgunWalletID: 'railgun-signer',
-        railgunAccountIndex: this.account,
+        railgunAccountIndex: request.railgunAccountIndex ?? this.account,
         chainId: BigInt(request.chainId),
         ephemeralIndex: request.ephemeralIndex,
       },
@@ -314,12 +315,35 @@ export class RailgunSigner {
     }
   }
 
+  /**
+   * Chain-scoping guard for an explicitly-supplied path: the EOA is derived from
+   * the path (whose word W1 is the chainId), and the authorization is signed
+   * against the same chainId in the 8-byte field. Reject an explicit `path` whose
+   * W1 disagrees with the authorization chainId — otherwise a caller could derive
+   * one chain's EOA but authorize on another, defeating chain-scoping. Session and
+   * fallback paths are built from the chainId, so they always match; only an
+   * explicit `path` can diverge, so that is the only case guarded here.
+   */
+  private assertPathChainId(path: readonly number[], chainId: bigint): void {
+    const suffix = encodeRailgunEthereumPathSuffixFromBip32Path(path);
+    const pathChainId = BigInt(new DataView(suffix.buffer, suffix.byteOffset, suffix.byteLength).getUint32(4, false));
+    if (pathChainId !== chainId) {
+      throw new HWError(
+        HWErrorCode.VALIDATION_DERIVATION_INDEX,
+        `7702 derivation path chainId (W1=${String(pathChainId)}) does not match the authorization chainId (${String(chainId)}).`,
+      );
+    }
+  }
+
   async signEip7702Authorization(request: Eip7702AuthorizationRequest): Promise<EthereumSignatureParts> {
     this.requireCapability(
       (capabilities) => capabilities.eip7702Authorization,
       'RAILGUN app does not advertise EIP-7702 authorization signing support.',
     );
     this.assertSessionChainId(request.session, request.chainId);
+    if (request.path !== undefined) {
+      this.assertPathChainId(request.path, request.chainId);
+    }
     const response = await this.transport.send(buildSignEip7702Authorization({
       ...request,
       path: request.path ?? request.session?.path ?? buildRailgunEthereumBip32Path({
