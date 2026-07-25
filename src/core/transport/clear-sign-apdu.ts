@@ -44,6 +44,15 @@ export const CLEAR_SIGN_MIN_GAS_PRICE_MAX = 1n << 48n;
 /** Transfer output type — 0 = Transfer. */
 export const CLEAR_SIGN_OUTPUT_TYPE_TRANSFER = 0;
 
+/**
+ * Per-output device response lengths, measured on firmware 1.6.1 clear-sign-v1.
+ * The device returns opaque ciphertext material the host later splices into the
+ * on-chain transact calldata; the orchestrator length-checks and collects it raw.
+ */
+export const CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH = 223; // OUT_BROADCASTER / OUT_CHANGE
+export const CLEAR_SIGN_TRANSFER_RESPONSE_LENGTH = 239; // OUT_TRANSFER (tuple + senderRandom + ann_iv)
+export const CLEAR_SIGN_UNSHIELD_RESPONSE_LENGTH = 32; // OUT_UNSHIELD commitment
+
 // ─── Encoding helpers ─────────────────────────────────────────────────────────
 
 function encodeUintBE(value: bigint, byteLength: number, label: string): Uint8Array {
@@ -304,6 +313,157 @@ export function buildClearSignOutUnshield(
 /** FINALIZE (P1 0x40): one dummy filler byte (the dispatcher rejects Lc=0). */
 export function buildClearSignFinalize(profile: ApduProfile = RAILGUN_PROFILE): ApduCommand {
   return { cla: profile.cla, ins: clearSignIns(profile), p1: ClearSignP1.FINALIZE, p2: 0, data: new Uint8Array([0]) };
+}
+
+// ─── Session orchestration surface ────────────────────────────────────────────
+
+/** A transact output, tagged so the orchestrator can pick the right OUT_* sub-command. */
+export type ClearSignOutput =
+  | ({ readonly kind: 'broadcaster' } & ClearSignBroadcasterOutput)
+  | ({ readonly kind: 'change' } & ClearSignChangeOutput)
+  | ({ readonly kind: 'transfer' } & ClearSignTransferOutput)
+  | ({ readonly kind: 'unshield' } & ClearSignUnshieldOutput);
+
+/**
+ * Build the OUT_* APDU for a tagged output and report the exact device response
+ * length to expect, so the session orchestrator can length-check each reply.
+ */
+export function buildClearSignOutput(
+  output: ClearSignOutput,
+  profile: ApduProfile = RAILGUN_PROFILE,
+): { readonly command: ApduCommand; readonly responseLength: number } {
+  switch (output.kind) {
+    case 'broadcaster':
+      return { command: buildClearSignOutBroadcaster(output, profile), responseLength: CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH };
+    case 'change':
+      return { command: buildClearSignOutChange(output, profile), responseLength: CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH };
+    case 'transfer':
+      return { command: buildClearSignOutTransfer(output, profile), responseLength: CLEAR_SIGN_TRANSFER_RESPONSE_LENGTH };
+    case 'unshield':
+      return { command: buildClearSignOutUnshield(output, profile), responseLength: CLEAR_SIGN_UNSHIELD_RESPONSE_LENGTH };
+  }
+}
+
+/** A single-tx CLEAR_SIGN transact to sign (n inputs, m outputs). */
+export type ClearSignTransactRequest = {
+  readonly account?: number;
+  /** 32-byte merkle root. */
+  readonly merkleRoot: Uint8Array;
+  /** One 32-byte nullifier per input (1..3). */
+  readonly nullifiers: readonly Uint8Array[];
+  /** Bound-params fields (tree, minGasPrice, unshield, chainID, adapt*). */
+  readonly boundParams: ClearSignBpFieldsRequest;
+  /** Outputs (1..3), sent in array order. */
+  readonly outputs: readonly ClearSignOutput[];
+};
+
+/** The raw device response for one streamed output (opaque ciphertext material). */
+export type ClearSignOutputResult = {
+  readonly kind: ClearSignOutput['kind'];
+  readonly response: Uint8Array;
+};
+
+/** Structured decode of a broadcaster/change/transfer OUT_* response (the 208-byte tuple + trailers). */
+export type ClearSignDecodedTuple = {
+  readonly random: Uint8Array; // 16
+  /** Blind1 — sender blinding key (32). */
+  readonly senderBlindingKey: Uint8Array;
+  /** Blind2 — recipient blinding key (32). */
+  readonly recipientBlindingKey: Uint8Array;
+  readonly iv: Uint8Array; // 16
+  readonly tag: Uint8Array; // 16
+  readonly ciphertext: Uint8Array; // 96
+  readonly senderRandom: Uint8Array; // 15
+  /** Present only for OUT_TRANSFER (16). */
+  readonly annotationIv?: Uint8Array;
+};
+
+/** A decoded OUT_* response: a note tuple, or an unshield commitment. */
+export type ClearSignDecodedOutput =
+  | ({ readonly kind: 'broadcaster' | 'change' | 'transfer' } & ClearSignDecodedTuple)
+  | { readonly kind: 'unshield'; readonly commitment: Uint8Array };
+
+/**
+ * Decode a raw OUT_* device response into its structured fields, using the byte
+ * layout the firmware author's reference (`clear-sign-apdus.js`) documents:
+ *   tuple(208) = random(16) ‖ Blind1(32) ‖ Blind2(32) ‖ IV(16) ‖ tag(16) ‖ ciphertext(96)
+ *   + senderRandom(15)  [+ annotationIv(16) for transfer];  unshield = commitment(32).
+ * These fields are what the RAILGUN engine assembles into the on-chain transact
+ * calldata (that assembly is protocol/ABI-specific and lives in the engine).
+ */
+export function decodeClearSignOutput(result: ClearSignOutputResult): ClearSignDecodedOutput {
+  const { kind, response } = result;
+  if (kind === 'unshield') {
+    assertBytes(response, CLEAR_SIGN_UNSHIELD_RESPONSE_LENGTH, 'OUT_UNSHIELD response');
+    return { kind, commitment: response.slice() };
+  }
+  const expected = kind === 'transfer'
+    ? CLEAR_SIGN_TRANSFER_RESPONSE_LENGTH
+    : CLEAR_SIGN_OUTPUT_TUPLE_RESPONSE_LENGTH;
+  assertBytes(response, expected, `OUT_${kind} response`);
+  const tuple = {
+    kind,
+    random: response.slice(0, 16),
+    senderBlindingKey: response.slice(16, 48),
+    recipientBlindingKey: response.slice(48, 80),
+    iv: response.slice(80, 96),
+    tag: response.slice(96, 112),
+    ciphertext: response.slice(112, 208),
+    senderRandom: response.slice(208, 223),
+  } as const;
+  return kind === 'transfer' ? { ...tuple, annotationIv: response.slice(223, 239) } : tuple;
+}
+
+// ─── Multi-tx (txToken ≠ feeToken) ────────────────────────────────────────────
+
+/** One sub-transaction within a multi-tx CLEAR_SIGN session. */
+export type ClearSignSubTransact = {
+  readonly merkleRoot: Uint8Array;
+  readonly nullifiers: readonly Uint8Array[];
+  readonly boundParams: ClearSignBpFieldsRequest;
+  readonly outputs: readonly ClearSignOutput[];
+};
+
+/**
+ * A multi-tx CLEAR_SIGN transact — the txToken ≠ feeToken case bundles two
+ * sub-transactions (value transfer in token A + broadcaster fee in token B),
+ * each with its own nullifiers / bound-params / outputs, signed together.
+ */
+export type ClearSignMultiTransactRequest = {
+  readonly account?: number;
+  /** 15-byte wallet-source tag; defaults to all-zero. */
+  readonly walletSource?: Uint8Array;
+  /** The sub-transactions (nTx ≥ 2 for the multi flow). */
+  readonly transactions: readonly ClearSignSubTransact[];
+};
+
+/**
+ * CS_INIT multi-tx (P1 0x00):
+ * account(4) ‖ nTx(1) ‖ walletSource(15) ‖ [merkleRoot(32) ‖ nIn(1) ‖ nOut(1)] × nTx.
+ */
+export function buildClearSignInitMultiTx(
+  request: ClearSignMultiTransactRequest,
+  profile: ApduProfile = RAILGUN_PROFILE,
+): ApduCommand {
+  const nTx = request.transactions.length;
+  // Device caps a multi-tx session at CS_MAX_TXS = 2 (txToken != feeToken).
+  if (!Number.isInteger(nTx) || nTx < 1 || nTx > 2) {
+    throw new Error(`CLEAR_SIGN multi-tx supports 1..2 transactions, got ${String(nTx)}`);
+  }
+  const walletSource = request.walletSource ?? new Uint8Array(15);
+  assertBytes(walletSource, 15, 'CLEAR_SIGN walletSource');
+  const perTx = request.transactions.map((tx) => {
+    assertBytes(tx.merkleRoot, 32, 'CLEAR_SIGN merkleRoot');
+    validateClearSignShape(tx.nullifiers.length, tx.outputs.length);
+    return concatBytes(tx.merkleRoot, new Uint8Array([tx.nullifiers.length, tx.outputs.length]));
+  });
+  const data = concatBytes(
+    encodeAccountIndex(request.account ?? 0),
+    new Uint8Array([nTx]),
+    walletSource,
+    ...perTx,
+  );
+  return { cla: profile.cla, ins: clearSignIns(profile), p1: ClearSignP1.INIT, p2: 0, data };
 }
 
 function encodeAscii127(value: string): Uint8Array {

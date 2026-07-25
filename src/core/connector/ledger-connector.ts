@@ -18,13 +18,15 @@
 import type {
   HardwareConnector,
   HardwareConnectorSignFn,
+  HardwareConnectorSignResult,
   LedgerConnectorConfig,
-  Signature,
   PublicInputsRailgun,
   RequestApprovalOptions,
 } from './types.js';
+import type { ClearSignTransactRequest, ClearSignMultiTransactRequest } from '../transport/clear-sign-apdu.js';
 import type { HWTransport } from '../transport/types.js';
 import { RailgunSigner } from '../signers/railgun-signer.js';
+import type { ClearSignMultiTransactResult } from '../signers/railgun-signer.js';
 import { getActiveApp, isVersionSatisfied } from '../device/device-manager.js';
 import { HWError, HWErrorCode } from '../errors.js';
 import { assertExpectedHashMatchesPublicInputs } from '../../validation/public-inputs.js';
@@ -112,12 +114,19 @@ export function createLedgerConnector(
     expectedHash: bigint,
     publicInputs?: PublicInputsRailgun,
     _subSession?: string,
-  ): Promise<Signature> => {
+    clearSign?: ClearSignTransactRequest,
+  ): Promise<HardwareConnectorSignResult> => {
     return serialized(async () => {
       if (publicInputs !== undefined) {
         await assertExpectedHashMatchesPublicInputs(expectedHash, publicInputs);
       }
       await ensureAppReady();
+      // Toggle: clear-sign the plaintext transact (device reviews it) and return its
+      // outputs; otherwise blind-sign the expected hash.
+      if (clearSign !== undefined) {
+        const result = await withTimeout(signer.signClearSignTransact(clearSign), signTimeout);
+        return { ...result.signature, clearSign: { msgHash: result.msgHash, outputs: result.outputs } };
+      }
       return withTimeout(signer.sign(expectedHash), signTimeout);
     });
   };
@@ -128,6 +137,15 @@ export function createLedgerConnector(
     // Batch approval is handled by the UI component / state machine.
     // The connector just returns true — the state machine gates actual signing.
     return Promise.resolve(true);
+  };
+
+  const signClearMultiTransact = (
+    request: ClearSignMultiTransactRequest,
+  ): Promise<ClearSignMultiTransactResult> => {
+    return serialized(async () => {
+      await ensureAppReady();
+      return withTimeout(signer.signClearSignMultiTransact(request), signTimeout);
+    });
   };
 
   const getPublicKey = async (): Promise<{ readonly x: bigint; readonly y: bigint }> => {
@@ -147,6 +165,7 @@ export function createLedgerConnector(
     type: 'ledger',
     deviceId: `ledger:${config.appName}`,
     sign,
+    signClearMultiTransact,
     requestBatchApproval,
     getPublicKey,
     isConnected,

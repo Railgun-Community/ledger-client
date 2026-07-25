@@ -12,10 +12,22 @@
  * connecting/disconnecting.
  */
 
-import type { HWTransport } from '../transport/types.js';
+import type { HWTransport, ApduCommand } from '../transport/types.js';
 import type { Signature } from '../connector/types.js';
 import type { ApduProfile, RailgunAppCapabilities } from '../transport/apdu-profile.js';
 import { RAILGUN_PROFILE } from '../transport/apdu-profile.js';
+import {
+  buildClearSignInit,
+  buildClearSignNullifier,
+  buildClearSignBpFields,
+  buildClearSignOutput,
+  buildClearSignFinalize,
+  buildClearSignInitMultiTx,
+  validateClearSignShape,
+  type ClearSignTransactRequest,
+  type ClearSignMultiTransactRequest,
+  type ClearSignOutputResult,
+} from '../transport/clear-sign-apdu.js';
 import {
   buildGetPublicKey,
   buildSignHash,
@@ -40,6 +52,9 @@ import {
   parseViewingKeyResponse,
   parseViewingPublicKeyResponse,
   parseRailgunAddressResponse,
+  parseClearSignFinalize,
+  parseClearSignFinalizeMulti,
+  parseClearSignOutputResponse,
   extractEchoedHash,
 } from '../../validation/apdu-response.js';
 import { validateSignature } from '../../validation/signature.js';
@@ -143,6 +158,19 @@ export type EthereumTxHashSignOptions = {
   readonly allowBlind?: boolean;
 };
 
+/** Result of a CLEAR_SIGN transact: the EdDSA signature, the echoed message hash, and the raw per-output responses. */
+export type ClearSignTransactResult = {
+  readonly signature: Signature;
+  readonly msgHash: Uint8Array;
+  readonly outputs: readonly ClearSignOutputResult[];
+};
+
+/** Result of a multi-tx CLEAR_SIGN transact: one signature per tx (same key), plus all output responses in order. */
+export type ClearSignMultiTransactResult = {
+  readonly signatures: ReadonlyArray<{ readonly signature: Signature; readonly msgHash: Uint8Array }>;
+  readonly outputs: readonly ClearSignOutputResult[];
+};
+
 /**
  * RAILGUN signer — sends custom APDU commands to the RAILGUN Ledger app.
  *
@@ -237,6 +265,111 @@ export class RailgunSigner {
     const response = await this.transport.send(buildGetRailgunAddress(this.account, this.profile));
     validateApduResponse(response);
     return parseRailgunAddressResponse(response.data);
+  }
+
+  private async sendClearSignStep(command: ApduCommand): Promise<void> {
+    const response = await this.transport.send(command);
+    validateApduResponse(response);
+  }
+
+  /**
+   * Clear-sign a RAILGUN transact (INS 0x11). Streams the session in order —
+   * CS_INIT → NULLIFIER×n → BP_FIELDS → OUT_*×m → FINALIZE — collecting each
+   * output's opaque device response, then parses the FINALIZE signature. The
+   * device shows the actual recipients/tokens/amounts and signs on approval.
+   *
+   * Returns the EdDSA signature, the echoed message hash, and the raw per-output
+   * responses (which the caller splices into the on-chain transact calldata).
+   * Experimental — see `CAPABILITY_STATUS.clearSign`.
+   */
+  async signClearSignTransact(request: ClearSignTransactRequest): Promise<ClearSignTransactResult> {
+    this.requireCapability(
+      (capabilities) => capabilities.railgunClearSign,
+      'RAILGUN app does not advertise CLEAR_SIGN transact support.',
+    );
+    const nIn = request.nullifiers.length;
+    const nOut = request.outputs.length;
+    validateClearSignShape(nIn, nOut);
+    const account = request.account ?? this.account;
+
+    // Pre-build the whole session first: every builder validates its field widths
+    // and ranges, so any illegal input throws BEFORE the first APDU is sent and
+    // never opens a session on the stateful device.
+    const initCommand = buildClearSignInit({ account, merkleRoot: request.merkleRoot, nIn, nOut }, this.profile);
+    const nullifierCommands = request.nullifiers.map((nullifier) => buildClearSignNullifier(nullifier, this.profile));
+    const bpCommand = buildClearSignBpFields(request.boundParams, this.profile);
+    const outputPlan = request.outputs.map((output) => ({ kind: output.kind, ...buildClearSignOutput(output, this.profile) }));
+    const finalizeCommand = buildClearSignFinalize(this.profile);
+
+    await this.sendClearSignStep(initCommand);
+    for (const command of nullifierCommands) {
+      await this.sendClearSignStep(command);
+    }
+    await this.sendClearSignStep(bpCommand);
+
+    const outputs: ClearSignOutputResult[] = [];
+    for (const { kind, command, responseLength } of outputPlan) {
+      const response = await this.transport.send(command);
+      validateApduResponse(response);
+      outputs.push({ kind, response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${kind}`) });
+    }
+
+    const finalizeResponse = await this.transport.send(finalizeCommand);
+    validateApduResponse(finalizeResponse);
+    const { signature, msgHash } = parseClearSignFinalize(finalizeResponse.data);
+    validateSignature(signature);
+    return { signature, msgHash, outputs };
+  }
+
+  /**
+   * Clear-sign a multi-tx transact (txToken ≠ feeToken). Sends the multi-tx
+   * CS_INIT, then streams each sub-transaction (NULLIFIER×n → BP_FIELDS →
+   * OUT_*×m) in order, and parses the combined FINALIZE into one signature per
+   * transaction (all under the same key). Experimental — see
+   * `CAPABILITY_STATUS.clearSign`.
+   */
+  async signClearSignMultiTransact(request: ClearSignMultiTransactRequest): Promise<ClearSignMultiTransactResult> {
+    this.requireCapability(
+      (capabilities) => capabilities.railgunClearSign,
+      'RAILGUN app does not advertise CLEAR_SIGN transact support.',
+    );
+    const txCount = request.transactions.length;
+    if (txCount < 2) {
+      throw new Error(`CLEAR_SIGN multi-tx requires at least 2 transactions, got ${String(txCount)}. Use signClearSignTransact for a single tx.`);
+    }
+    for (const tx of request.transactions) {
+      validateClearSignShape(tx.nullifiers.length, tx.outputs.length);
+    }
+
+    // Pre-build the whole multi-tx session (the multi CS_INIT also enforces nTx <= 2
+    // and each sub-tx's field widths) so any illegal input throws before any APDU.
+    const initCommand = buildClearSignInitMultiTx({ ...request, account: request.account ?? this.account }, this.profile);
+    const txPlans = request.transactions.map((tx) => ({
+      nullifierCommands: tx.nullifiers.map((nullifier) => buildClearSignNullifier(nullifier, this.profile)),
+      bpCommand: buildClearSignBpFields(tx.boundParams, this.profile),
+      outputPlan: tx.outputs.map((output) => ({ kind: output.kind, ...buildClearSignOutput(output, this.profile) })),
+    }));
+    const finalizeCommand = buildClearSignFinalize(this.profile);
+
+    await this.sendClearSignStep(initCommand);
+    const outputs: ClearSignOutputResult[] = [];
+    for (const plan of txPlans) {
+      for (const command of plan.nullifierCommands) {
+        await this.sendClearSignStep(command);
+      }
+      await this.sendClearSignStep(plan.bpCommand);
+      for (const { kind, command, responseLength } of plan.outputPlan) {
+        const response = await this.transport.send(command);
+        validateApduResponse(response);
+        outputs.push({ kind, response: parseClearSignOutputResponse(response.data, responseLength, `OUT_${kind}`) });
+      }
+    }
+
+    const finalizeResponse = await this.transport.send(finalizeCommand);
+    validateApduResponse(finalizeResponse);
+    const signatures = parseClearSignFinalizeMulti(finalizeResponse.data, txCount);
+    for (const { signature } of signatures) validateSignature(signature);
+    return { signatures, outputs };
   }
 
   private async getEthereumPublicKeyAtPath(request: RailgunEthereumPreloadRequest, display: boolean): Promise<Uint8Array> {

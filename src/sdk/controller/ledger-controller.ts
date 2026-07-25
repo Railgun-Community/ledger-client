@@ -28,7 +28,13 @@ import { classifyDeviceError } from '../../core/transport/status-words.js';
 import type {
   RailgunEthereumPreloadRequest,
   RailgunEthereumSignerSession,
+  ClearSignTransactResult,
+  ClearSignMultiTransactResult,
 } from '../../core/signers/railgun-signer.js';
+import type {
+  ClearSignTransactRequest,
+  ClearSignMultiTransactRequest,
+} from '../../core/transport/clear-sign-apdu.js';
 import type {
   ActiveAppInfo,
   AppRequirement,
@@ -1297,6 +1303,30 @@ export function createLedgerController(
             normalizeEthOperationError(error, 'RAILGUN app EIP-7702 authorization signing failed.'),
           );
         }
+      }),
+
+    signClearSignTransact: (request: ClearSignTransactRequest): Promise<ClearSignTransactResult> =>
+      enqueue(async () => {
+        ensureNotDisposed();
+        if (connector === null) {
+          await ensureReadyInternal();
+        }
+        if (transport === null) {
+          throw new HWError(HWErrorCode.TRANSPORT_DISCONNECTED, 'Transport not connected.');
+        }
+        return new RailgunSigner({ transport }).signClearSignTransact(request);
+      }),
+
+    signClearSignMultiTransact: (request: ClearSignMultiTransactRequest): Promise<ClearSignMultiTransactResult> =>
+      enqueue(async () => {
+        ensureNotDisposed();
+        if (connector === null) {
+          await ensureReadyInternal();
+        }
+        if (transport === null) {
+          throw new HWError(HWErrorCode.TRANSPORT_DISCONNECTED, 'Transport not connected.');
+        }
+        return new RailgunSigner({ transport }).signClearSignMultiTransact(request);
       }),
 
     sign: (

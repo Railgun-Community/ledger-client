@@ -187,6 +187,57 @@ export function parseClearSignFinalize(
 }
 
 /**
+ * Parse a multi-tx CLEAR_SIGN FINALIZE response (txToken ≠ feeToken).
+ *
+ * Layout: `txCount` × 128-byte quads `R8.x(32) ‖ R8.y(32) ‖ S(32) ‖ msgHash(32)`
+ * — no `0x60` length prefix (unlike the single-tx 129-byte form). Signatures are
+ * returned positionally (index i → transaction i), all under the same key.
+ * Device-verified: two txs → 256 bytes.
+ */
+export function parseClearSignFinalizeMulti(
+  data: Uint8Array,
+  txCount: number,
+): ReadonlyArray<{ readonly signature: Signature; readonly msgHash: Uint8Array }> {
+  const expected = txCount * 128;
+  if (data.length !== expected) {
+    throw new HWError(
+      HWErrorCode.SIGN_INVALID_RESPONSE,
+      `Expected ${String(expected)} bytes for CLEAR_SIGN multi-tx FINALIZE (${String(txCount)} txs), got ${String(data.length)}`,
+    );
+  }
+  const results: Array<{ readonly signature: Signature; readonly msgHash: Uint8Array }> = [];
+  for (let i = 0; i < txCount; i++) {
+    const quad = data.subarray(i * 128, i * 128 + 128);
+    const signature = parseSignResponse(quad, false); // 128B = sig(96) + msgHash(32), no prefix
+    const msgHash = extractEchoedHash(quad, false);
+    if (msgHash === null) {
+      throw new HWError(HWErrorCode.SIGN_INVALID_RESPONSE, `CLEAR_SIGN multi-tx FINALIZE quad ${String(i)} is missing its message hash`);
+    }
+    results.push({ signature, msgHash });
+  }
+  return results;
+}
+
+/**
+ * Length-check a streamed CLEAR_SIGN OUT_* response and return a copy of the raw
+ * bytes — opaque ciphertext material the host later splices into the on-chain
+ * transact calldata. Device response lengths are fixed per output kind.
+ */
+export function parseClearSignOutputResponse(
+  data: Uint8Array,
+  expectedLength: number,
+  label: string,
+): Uint8Array {
+  if (data.length !== expectedLength) {
+    throw new HWError(
+      HWErrorCode.APDU_INVALID_RESPONSE,
+      `Expected ${String(expectedLength)} bytes for CLEAR_SIGN ${label} response, got ${String(data.length)}`,
+    );
+  }
+  return data.slice();
+}
+
+/**
  * Convert a big-endian Uint8Array to bigint.
  */
 function bytesToBigInt(bytes: Uint8Array): bigint {

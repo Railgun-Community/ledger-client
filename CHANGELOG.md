@@ -3,6 +3,35 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.4.0 — 2026-07-24
+
+Grows the CLEAR_SIGN transact surface from the 0.3.0 builders into full, engine-ready
+signing. Still experimental and requires firmware **1.6.1 (clear-sign-v1)** on the device.
+Verified against device-measured response layouts; a live on-hardware transact round-trip
+is still pending.
+
+### Added
+
+- **CLEAR_SIGN transact signing (single-tx).** A session orchestrator streams the full
+  sequence (`CS_INIT → NULLIFIER×n → BP_FIELDS → OUT_* → FINALIZE`), collects each output
+  response, and parses the 129-byte finalize (signature + message hash). Exposed through
+  the signer and the controller.
+- **Clear-sign toggle on the connector `sign` flow (engine-ready).** `sign` accepts an
+  optional plaintext transact; when supplied, the device reviews the recipients, tokens,
+  and amounts and generates the output ciphertexts, and the result carries the device
+  message hash and per-output responses alongside the signature. Without it, `sign`
+  blind-signs exactly as before — a pure addition.
+- **Dual-tx (txToken ≠ feeToken) clear-sign** via `signClearMultiTransact` on the connector
+  — one signature per sub-transaction, capped at the device maximum of two.
+- **`decodeClearSignOutput`** — decodes a raw `OUT_*` response into its structured fields
+  (random, sender/recipient blinding keys, IV, tag, ciphertext, senderRandom, and the
+  transfer annotation IV) off the firmware reference layout.
+
+### Changed
+
+- The `RAILGUN_CLEAR_SIGN_STATE` status word (`0xb007`) now maps to a clear, best-effort
+  error instead of a generic device failure.
+
 ## 0.3.1 — 2026-07-24
 
 ### Changed

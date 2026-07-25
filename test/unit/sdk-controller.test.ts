@@ -6,6 +6,15 @@ import { RAILGUN_APP } from '../../src/core/device/app-registry.js';
 import { EthSigner, RAILGUN_SHIELD_MESSAGE } from '../../src/core/signers/eth-signer.js';
 import { HWError, HWErrorCode } from '../../src/core/errors.js';
 import { StatusWord } from '../../src/core/transport/types.js';
+import { encodeErc20TokenHash } from '../../src/core/transport/clear-sign-apdu.js';
+
+/** 129-byte FINALIZE: 0x60 || R8x(0) || R8y(1) || S(7) || msgHash. */
+function clearSignFinalize129(): Uint8Array {
+  const f = new Uint8Array(129);
+  f[0] = 0x60; f[64] = 0x01; f[96] = 0x07;
+  f.set(new Uint8Array(32).fill(0xcd), 97);
+  return f;
+}
 
 function buildVersionResponse(
   targetId: number,
@@ -440,6 +449,41 @@ describe('createLedgerController', () => {
     expect(walletArtifacts.railgunAddress.startsWith('0zk1')).toBe(true);
     expect(controller.getSnapshot().deviceSession?.activeApp?.name).toBe('RAILGUN');
     expect(controller.getSnapshot().requiredApp?.name).toBe('RAILGUN');
+  });
+
+  it('clear-signs a transact through the controller (auto-readies, delegates to the signer)', async () => {
+    const controller = createController();
+    await controller.connect();
+    transport.enqueueResponses([
+      // ensureReady
+      successResponse(buildAppVersionResponse('BOLOS', '0.0.0')),
+      successResponse(buildVersionResponse(0x33100004, '1.5.1', 0, '1.1')),
+      successResponse(new Uint8Array(0)),
+      successResponse(buildAppVersionResponse('RAILGUN', '0.1.0')),
+      // clear-sign session: CS_INIT, NULLIFIER, BP_FIELDS, OUT_UNSHIELD (32B), FINALIZE (129B)
+      successResponse(new Uint8Array(0)),
+      successResponse(new Uint8Array(0)),
+      successResponse(new Uint8Array(0)),
+      successResponse(new Uint8Array(32).fill(0xab)),
+      successResponse(clearSignFinalize129()),
+    ]);
+
+    const result = await controller.signClearSignTransact({
+      merkleRoot: new Uint8Array(32).fill(0x11),
+      nullifiers: [new Uint8Array(32).fill(0x22)],
+      boundParams: { treeNumber: 0, minGasPrice: 1n, unshield: true, chainId: 1n },
+      outputs: [{
+        kind: 'unshield',
+        recipientAddress: new Uint8Array(20).fill(0xd8),
+        tokenHash: encodeErc20TokenHash(new Uint8Array(20).fill(0x6b)),
+        value: 0x40000n,
+      }],
+    });
+
+    expect(result.signature.S).toBe(7n);
+    expect(result.msgHash).toEqual(new Uint8Array(32).fill(0xcd));
+    expect(result.outputs).toEqual([{ kind: 'unshield', response: new Uint8Array(32).fill(0xab) }]);
+    expect(controller.getSnapshot().deviceSession?.activeApp?.name).toBe('RAILGUN');
   });
 
   it('surfaces openApp cancellation instead of hanging in opening_app', async () => {

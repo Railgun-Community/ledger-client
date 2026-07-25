@@ -1,5 +1,7 @@
 import type { ApduProfile } from '../transport/apdu-profile.js';
 import type { Assert, Equals, Resolve } from '../internal/type-assert.js';
+import type { ClearSignTransactRequest, ClearSignOutputResult, ClearSignMultiTransactRequest } from '../transport/clear-sign-apdu.js';
+import type { ClearSignMultiTransactResult } from '../signers/railgun-signer.js';
 
 /**
  * RAILGUN engine-facing connector types.
@@ -39,16 +41,37 @@ export type RequestApprovalOptions = {
 };
 
 /**
+ * Result of a connector sign. It IS a `Signature` (R8/S) — callers that only need
+ * the signature are unaffected — with, when the clear-sign toggle was used, the
+ * device-computed message hash and per-output responses attached.
+ */
+export type HardwareConnectorSignResult = Signature & {
+  /**
+   * Present only when `clearSign` was passed: the device-computed `msgHash` and the
+   * per-output device responses (the caller splices these into the on-chain
+   * transact calldata). Absent for a normal (blind) sign.
+   */
+  readonly clearSign?: {
+    readonly msgHash: Uint8Array;
+    readonly outputs: readonly ClearSignOutputResult[];
+  };
+};
+
+/**
  * Sign function signature — matches engine's expected connector.sign() shape.
  * @param expectedHash - poseidon hash of the sign message (32 bytes as bigint)
  * @param publicInputs - optional public inputs for display/validation
  * @param subSession - optional sub-session ID for batch correlation
+ * @param clearSign - toggle: when provided, the device clear-signs the plaintext
+ *   transact (reviewing recipients/tokens/amounts) and returns its outputs, instead
+ *   of blind-signing `expectedHash`. Requires the `railgunClearSign` capability.
  */
 export type HardwareConnectorSignFn = (
   expectedHash: bigint,
   publicInputs?: PublicInputsRailgun,
   subSession?: string,
-) => Promise<Signature>;
+  clearSign?: ClearSignTransactRequest,
+) => Promise<HardwareConnectorSignResult>;
 
 /** Connector config. */
 export type LedgerConnectorConfig = {
@@ -76,6 +99,15 @@ export type CommonConnectorBase = {
 
   /** Sign a poseidon hash, returning a BabyJubjub EdDSA signature. */
   sign: HardwareConnectorSignFn;
+
+  /**
+   * Clear-sign a multi-tx transact (txToken != feeToken → one signature per tx).
+   * The single-tx case is the `clearSign` toggle on `sign`; this covers the
+   * two-signature case that doesn't fit a single-signature return. Experimental.
+   */
+  signClearMultiTransact: (
+    request: ClearSignMultiTransactRequest,
+  ) => Promise<ClearSignMultiTransactResult>;
 
   /** Get the BabyJubjub public key from the device. */
   getPublicKey: () => Promise<{ readonly x: bigint; readonly y: bigint }>;
@@ -111,6 +143,9 @@ type HardwareConnector_Reference = {
   readonly type: 'ledger';
   readonly deviceId: string;
   sign: HardwareConnectorSignFn;
+  signClearMultiTransact: (
+    request: ClearSignMultiTransactRequest,
+  ) => Promise<ClearSignMultiTransactResult>;
   requestBatchApproval: (
     requests: readonly RequestApprovalOptions[],
   ) => Promise<boolean>;

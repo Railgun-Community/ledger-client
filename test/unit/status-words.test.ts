@@ -25,6 +25,12 @@ describe('statusWordToHWError', () => {
     expect(err.code).toBe(HWErrorCode.APDU_STATUS_ERROR);
     expect(err.message).toContain('0x1234');
   });
+
+  it('maps the RAILGUN CLEAR_SIGN state SW (0xb007) to a clear message', () => {
+    const err = statusWordToHWError(StatusWord.RAILGUN_CLEAR_SIGN_STATE);
+    expect(err.code).toBe(HWErrorCode.APDU_STATUS_ERROR);
+    expect(err.message).toContain('CLEAR_SIGN');
+  });
 });
 
 describe('classifyDeviceError', () => {
