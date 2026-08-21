@@ -3,6 +3,22 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.4.1 — 2026-08-21
+
+### Fixed
+
+- **`NodeHIDTransport` is reachable from consumers.** The package `exports` map previously
+  declared only `"."`, so the deep path every Node consumer was directed to
+  (`dist/core/transport/nodehid-transport.js`) was blocked by Node and TypeScript
+  (`ERR_MODULE_NOT_FOUND` / `TS2307`), and the class was not re-exported from the root either.
+  Both routes the transport factory's own error message suggests — direct import and
+  `transportFactory` injection — were therefore impossible. Added a `./node` subpath export
+  and a root re-export. Use `@railgun-community/ledger-client/node` in bare Node ESM; the root
+  barrel reaches `@ledgerhq/errors@6.32.0`, whose `lib-es` build Node's ESM resolver rejects.
+- **`@ledgerhq/hw-transport-node-hid` declared as an optional peer dependency**, matching the
+  existing treatment of the WebHID and Web BLE transports. It was a devDependency only, so
+  consumers were never told to install it.
+
 ## 0.4.0 — 2026-07-24
 
 Grows the CLEAR_SIGN transact surface from the 0.3.0 builders into full, engine-ready

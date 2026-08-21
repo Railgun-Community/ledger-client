@@ -48,12 +48,36 @@ loaded lazily on `connect()`). `'nodehid'` throws a directional `HWError` — No
 - a **user gesture** to trigger the device-selection prompt (call `connect()` from a click)
 - not embedded in an iframe that blocks the `hid` Permissions-Policy
 
-## Node — scripts & tests
+## Node — NodeHIDTransport
 
-The bundled scripts (`install-app.ts`, `test-*-live.ts`) use a Node HID transport internally
-over `@ledgerhq/hw-transport-node-hid`. For unit tests, inject a **mock** transport through
-the controller's `transportFactory` (see [controller.md](./controller.md#controller-options))
-rather than touching real hardware.
+`NodeHIDTransport` is constructed directly — the browser `createTransport` factory does not
+build it. Import it from the **`/node` subpath**:
+
+```ts
+import { NodeHIDTransport } from '@railgun-community/ledger-client/node';
+
+const transport = new NodeHIDTransport();
+await transport.connect();
+```
+
+It is also re-exported from the package root, which is the convenient form under a bundler.
+**In bare Node ESM, use the subpath.** The root barrel statically pulls in
+`@ledgerhq/hw-transport-webhid` and `@ledgerhq/hw-transport`, which reach
+`@ledgerhq/errors@6.32.0` — that package's `lib-es` build uses an extensionless relative import
+that Node's ESM resolver rejects (`ERR_MODULE_NOT_FOUND` on `lib-es/helpers`). Bundlers resolve
+it; bare `node` does not. The `/node` subpath sidesteps it entirely — `nodehid-transport` has no
+static `@ledgerhq` imports at all.
+
+It requires the optional peer dep `@ledgerhq/hw-transport-node-hid` (native `node-hid`
+bindings), loaded lazily on `connect()` — so importing it in a browser bundle pulls in nothing
+Node-specific, and consumers that never use it don't need the dep installed.
+
+To use it through the controller, inject it:
+`createLedgerController({ transportFactory: () => new NodeHIDTransport() })`.
+
+The bundled scripts (`install-app.ts`, `test-*-live.ts`) use this transport internally. For unit
+tests, inject a **mock** transport through the controller's `transportFactory` (see
+[controller.md](./controller.md#controller-options)) rather than touching real hardware.
 
 ## Choosing / injecting a transport
 
