@@ -27,7 +27,7 @@ export function createTransport(config?: TransportConfig): HWTransport {
     case 'nodehid':
       throw new HWError(
         HWErrorCode.TRANSPORT_NOT_AVAILABLE,
-        'Node HID transport is Node-only and not constructed by the browser factory. Import NodeHIDTransport directly in a Node context, or inject it via the controller transportFactory option.',
+        'Node HID transport is Node-only and not constructed by the browser factory. Import it in a Node context (`import { NodeHIDTransport } from "@railgun-community/ledger-client/node"`), or inject it via the controller transportFactory option.',
       );
 
     case 'ble':

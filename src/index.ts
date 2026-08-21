@@ -328,6 +328,7 @@ export {
 export { createTransport } from './core/transport/transport-factory.js';
 export { WebHIDTransport } from './core/transport/webhid-transport.js';
 export { WebBLETransport } from './core/transport/web-ble-transport.js';
+export { NodeHIDTransport } from './core/transport/nodehid-transport.js';
 
 // ─── Device-state recovery ───────────────────────────────────────────────────
 export { clearDeviceState } from './core/transport/clear-state.js';
