@@ -23,6 +23,14 @@ project is pre-1.0 and experimental; expect breaking changes on minor versions.
   RAILGUN transaction signing is untouched: `SIGN_HASH` (`INS 0x12`) still signs the hash of any
   batch that is not clear-signed.
 
+- **A single clear-sign session can carry the wallet source.** The device encrypts a 15-byte
+  wallet-source tag into a transfer's annotation data, which is part of the hash it signs.
+  `signClearSignTransact` only ever sent the 38-byte `CS_INIT`, which leaves the tag as 15 zero
+  bytes, so a host rebuilding the hash with a non-empty wallet source could not match the
+  device's message hash for a transfer. `ClearSignTransactRequest.walletSource` (and
+  `ClearSignInitRequest.walletSource`) now sends the 53-byte `CS_INIT` firmware 1.6.1 accepts.
+  Without it the 38-byte form is sent as before.
+
 ### Added
 
 - `RAILGUN_EIP7702_DERIVATION_PREFIX`, `toRailgunEip7702DerivationPath(path)` and

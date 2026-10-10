@@ -131,6 +131,11 @@ export type ClearSignInitRequest = {
   readonly nIn: number;
   /** Number of device outputs, 1..3. */
   readonly nOut: number;
+  /**
+   * 15-byte wallet-source tag the device encrypts into a transfer's annotation
+   * data. Omitted, the device uses 15 zero bytes.
+   */
+  readonly walletSource?: Uint8Array;
 };
 
 export type ClearSignBpFieldsRequest = {
@@ -180,17 +185,27 @@ export type ClearSignUnshieldOutput = {
 
 // ─── Builders ─────────────────────────────────────────────────────────────────
 
-/** CS_INIT (P1 0x00): account(4) ‖ merkleRoot(32) ‖ nIn(1) ‖ nOut(1). */
+/**
+ * CS_INIT (P1 0x00): account(4) ‖ merkleRoot(32) ‖ nIn(1) ‖ nOut(1) [‖ walletSource(15)].
+ *
+ * Firmware 1.6.1 accepts exactly two lengths here: 38 bytes, which leaves the
+ * wallet source as 15 zero bytes, and 53 bytes, which carries it. The 53-byte
+ * form is sent only when `walletSource` is given.
+ */
 export function buildClearSignInit(
   request: ClearSignInitRequest,
   profile: ApduProfile = RAILGUN_PROFILE,
 ): ApduCommand {
   assertBytes(request.merkleRoot, 32, 'CLEAR_SIGN merkleRoot');
   validateClearSignShape(request.nIn, request.nOut);
+  if (request.walletSource !== undefined) {
+    assertBytes(request.walletSource, 15, 'CLEAR_SIGN walletSource');
+  }
   const data = concatBytes(
     encodeAccountIndex(request.account ?? 0),
     request.merkleRoot,
     new Uint8Array([request.nIn, request.nOut]),
+    request.walletSource ?? new Uint8Array(0),
   );
   return { cla: profile.cla, ins: clearSignIns(profile), p1: ClearSignP1.INIT, p2: 0, data };
 }
@@ -355,6 +370,12 @@ export type ClearSignTransactRequest = {
   readonly boundParams: ClearSignBpFieldsRequest;
   /** Outputs (1..3), sent in array order. */
   readonly outputs: readonly ClearSignOutput[];
+  /**
+   * 15-byte wallet-source tag. Required to reproduce the device's message hash
+   * when the transact has a transfer output and the wallet source is not empty:
+   * the device encrypts it into the transfer's annotation data.
+   */
+  readonly walletSource?: Uint8Array;
 };
 
 /** The raw device response for one streamed output (opaque ciphertext material). */

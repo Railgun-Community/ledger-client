@@ -62,6 +62,11 @@ the EdDSA signature, the echoed message hash, and the raw per-output device resp
 | `signClearSignTransact(request)` | Clear-sign a single transact (n inputs, m outputs; `n,m ≤ 3`, `n+m ≤ 5`). |
 | `signClearSignMultiTransact(request)` | Clear-sign a multi-tx bundle (`txToken ≠ feeToken` → one signature per tx). |
 
+`request.walletSource` (15 bytes, optional on both) is the wallet-source tag the device encrypts
+into a transfer's annotation data. A host that rebuilds the bound-params hash must send the same
+bytes it uses, or the device's message hash will not match; omitted, the device uses 15 zero
+bytes. On a single transact it is sent as a 53-byte `CS_INIT` (the 38-byte form plus the tag).
+
 Both are also exposed on [`LedgerController`](./controller.md) (managed lifecycle). Splicing the
 returned output responses into the on-chain transact calldata (full engine integration) is not
 included.

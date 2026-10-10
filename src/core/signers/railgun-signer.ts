@@ -299,7 +299,16 @@ export class RailgunSigner {
     // Pre-build the whole session first: every builder validates its field widths
     // and ranges, so any illegal input throws BEFORE the first APDU is sent and
     // never opens a session on the stateful device.
-    const initCommand = buildClearSignInit({ account, merkleRoot: request.merkleRoot, nIn, nOut }, this.profile);
+    const initCommand = buildClearSignInit(
+      {
+        account,
+        merkleRoot: request.merkleRoot,
+        nIn,
+        nOut,
+        ...(request.walletSource !== undefined ? { walletSource: request.walletSource } : {}),
+      },
+      this.profile,
+    );
     const nullifierCommands = request.nullifiers.map((nullifier) => buildClearSignNullifier(nullifier, this.profile));
     const bpCommand = buildClearSignBpFields(request.boundParams, this.profile);
     const outputPlan = request.outputs.map((output) => ({ kind: output.kind, ...buildClearSignOutput(output, this.profile) }));
