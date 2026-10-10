@@ -69,12 +69,19 @@ included.
 ### Ethereum / EIP-7702 methods (under development)
 
 The RAILGUN app derives Ethereum EOAs from a **caller-chosen** path
-`m/7702'/1984'/account'/chainId'/ephemeralIndex'`. All three trailing words —
+`m/44'/60'/1984'/7702'/account'/chainId'/ephemeralIndex'` (the first four levels are pinned
+by the firmware and never sent). All three trailing words —
 `account` (W0), `chainId` (W1), `ephemeralIndex` (W2) — are settable, and because `chainId`
 is one of them, **each chain derives a distinct EOA** (chain-scoped: a wallet can run on many
 chains at once without reusing a 7702 address). Each word is a hardened index and must fit in
 31 bits, so chains with `chainId >= 2**31` are rejected. These methods are gated on the app's
 advertised capabilities and throw `APP_VERSION_MISMATCH` if unsupported.
+
+The `path` arrays these methods take and return are five-word *slot descriptors*
+`[7702', 1984', W0, W1, W2]`, not the derivation path: only `W0 ‖ W1 ‖ W2` reach the device,
+and a word may be written hardened or not (the firmware hardens all three either way).
+`toRailgunEip7702DerivationPath(path)` and `formatRailgunEip7702DerivationPath(path)` return
+the path the device actually derives.
 
 | Method | Purpose |
 |--------|---------|

@@ -3,6 +3,24 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## Unreleased
+
+### Fixed
+
+- **The 7702 derivation path is described correctly.** Firmware 1.6.1 derives the 7702 EOA at
+  `m/44'/60'/1984'/7702'/W0'/W1'/W2'` — the prefix is pinned on-device and all three host words
+  are force-hardened. The docs and comments previously gave `m/7702'/1984'/…`. The wire format
+  and every derived address are unchanged: the SDK's five-word `path` arrays are slot
+  descriptors of which only `W0 ‖ W1 ‖ W2` are sent.
+- **Explicit 7702 paths may write `W1`/`W2` hardened.** `1'` and `1` now name the same slot, as
+  they do on the device; previously a hardened chainId word was rejected by the chain-scoping
+  guard. A hardened chainId word that disagrees with the authorization chainId is still rejected.
+
+### Added
+
+- `RAILGUN_EIP7702_DERIVATION_PREFIX`, `toRailgunEip7702DerivationPath(path)` and
+  `formatRailgunEip7702DerivationPath(path)` — the real BIP-32 path for a slot descriptor.
+
 ## 0.4.1 — 2026-08-21
 
 ### Fixed

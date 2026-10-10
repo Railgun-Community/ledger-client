@@ -91,7 +91,8 @@ if (capabilities.eip7702Authorization && capabilities.ethereumTxHash) {
 
 `prepareEthereumSigner()` binds the app-native Ethereum signing context to a
 **caller-chosen** 7702 EOA path
-`m/7702'/1984'/account'/chainId'/ephemeralIndex'`. All three trailing words are
+`m/44'/60'/1984'/7702'/account'/chainId'/ephemeralIndex'` (the first four levels are
+pinned by the firmware). All three trailing words are
 customizable, and because `chainId` is word W1 each chain derives a **distinct** EOA
 (chain-scoped — one wallet across many chains without reusing an address). The RAILGUN
 app's `INS 0x07` preload APDU sends those three words to derive the same EOA that
@@ -102,12 +103,21 @@ app's `INS 0x07` preload APDU sends those three words to derive the same EOA tha
 `signEthereumTxHash()` uses `INS 0x09` with `P1 = 0x01` (on-device review); firmware
 1.6.1 rejects a standalone `P1 = 0x00`, so pass `display: true`.
 
+`session.path` is a five-word slot descriptor, not the derivation path. To show or log
+the path the device derives (and displays), convert it:
+
+```ts
+import { formatRailgunEip7702DerivationPath } from '@railgun-community/ledger-client';
+
+formatRailgunEip7702DerivationPath(session.path); // "m/44'/60'/1984'/7702'/0'/1'/0'"
+```
+
 For an EIP-712 routing experiment through the standard Ethereum app, use the
 custom-path helpers and verify the returned ETH-app address matches the RAILGUN
 app address before relying on the signature:
 
 ```ts
-const path = "m/7702'/1984'/0'/1/0";
+const path = formatRailgunEip7702DerivationPath(session.path); // "m/44'/60'/1984'/7702'/0'/1'/0'"
 const ethAddress = await controller.getEthAddressAtPath(path, true);
 const signature = await controller.signEthTypedDataAtPath({
   domainSeparatorHex,
@@ -115,9 +125,9 @@ const signature = await controller.signEthTypedDataAtPath({
 }, path);
 ```
 
-This route depends on the Ethereum app accepting the non-standard path. It does
+This route depends on the Ethereum app accepting the seven-level path. It does
 not replace the custom RAILGUN APDU path. On devices where the Ethereum app
-rejects `m/7702'/1984'/...`, sign the EIP-712 digest through the RAILGUN app's
+rejects the path, sign the EIP-712 digest through the RAILGUN app's
 `INS 0x09` standalone hash signing flow instead.
 
 ## Testing With A Custom Transport Factory

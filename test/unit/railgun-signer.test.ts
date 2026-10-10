@@ -305,6 +305,35 @@ describe('RailgunSigner', () => {
       expect(transport.sentCommands).toHaveLength(0);
     });
 
+    it('accepts an explicit path whose chainId and index words are written hardened', async () => {
+      // The device hardens W0..W2 itself, so `1'` and `1` name the same slot: the chain guard
+      // must compare the index, and the wire suffix must carry it without the hardened bit.
+      transport.enqueueResponse(ethereumSignatureResponse(1));
+
+      await signer.signEip7702Authorization({
+        path: [0x8000_1e16, 0x8000_07c0, 0x8000_0000, 0x8000_0001, 0x8000_0003],
+        chainId: 1n,
+        contractAddress: new Uint8Array(20).fill(0x11),
+        nonce: 7n,
+      });
+
+      expect(Buffer.from(transport.sentCommands[0]?.data?.slice(0, 12) ?? new Uint8Array()).toString('hex')).toBe(
+        '000000000000000100000003',
+      );
+    });
+
+    it('still rejects a hardened explicit chainId word that differs from the auth chainId', async () => {
+      await expect(signer.signEip7702Authorization({
+        path: [0x8000_1e16, 0x8000_07c0, 0x8000_0000, 0x8000_0001, 0],
+        chainId: 137n,
+        contractAddress: new Uint8Array(20).fill(0x11),
+        nonce: 7n,
+      })).rejects.toMatchObject({
+        code: HWErrorCode.VALIDATION_DERIVATION_INDEX,
+      });
+      expect(transport.sentCommands).toHaveLength(0);
+    });
+
     it('signs Ethereum tx hashes in gated blind-signing mode', async () => {
       signer = new RailgunSigner({ transport, account: 7 });
       transport.enqueueResponse(ethereumSignatureResponse(0));
