@@ -154,6 +154,10 @@ export type EthereumTxHashSignOptions = {
    * Explicit opt-in required to blind-sign (display: false). Without it, a
    * display:false request is rejected — the device would otherwise sign a
    * 32-byte digest with no on-screen context. Prefer clear signing.
+   *
+   * The opt-in only matters for a profile that advertises `'blind'` in
+   * `ethereumSigning`. `RAILGUN_PROFILE` (firmware 1.6.1) does not, so there a
+   * display:false request is rejected before any APDU is sent.
    */
   readonly allowBlind?: boolean;
 };
@@ -510,7 +514,9 @@ export class RailgunSigner {
     );
     this.requireCapability(
       (capabilities) => capabilities.ethereumSigning.includes(display ? 'clear' : 'blind'),
-      `RAILGUN app does not advertise ${display ? 'clear' : 'blind'} Ethereum signing support.`,
+      display
+        ? 'RAILGUN app does not advertise clear Ethereum signing support.'
+        : 'RAILGUN app does not advertise blind Ethereum signing support: SIGN_TX_HASH requires on-device review (P1=0x01). Use display: true.',
     );
 
     const response = await this.transport.send(

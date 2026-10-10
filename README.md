@@ -145,7 +145,7 @@ The SDK's `path` arrays (`RAILGUN_EIP7702_BIP32_PATH`, `buildRailgunEthereumBip3
 
 For RelayAdapt7702, build the EIP-712 digest host-side, sign the 32-byte digest through `signRailgunEthereumHash`, then recover the address and require it to match the preloaded signer session.
 
-This is RAILGUN-app hash signing: the device reviews the path and the 32-byte digest, not the decoded EIP-712 fields.
+This is RAILGUN-app hash signing: the device reviews the path and the 32-byte digest, not the decoded EIP-712 fields. Firmware 1.6.1 signs an Ethereum digest for the 7702 EOA only with on-device review (`display: true`); a `display: false` request is rejected by the SDK before any APDU is sent. RAILGUN transaction signing is a separate command and is not affected: `SIGN_HASH` (`INS 0x12`) still signs the hash of any batch that is not clear-signed.
 
 The simplest direct integration is to ask `RailgunSigner` for the engine-compatible signer:
 

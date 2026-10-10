@@ -101,7 +101,8 @@ app's `INS 0x07` preload APDU sends those three words to derive the same EOA tha
 
 `signEip7702Authorization()` uses the custom RAILGUN app `INS 0x08` APDU.
 `signEthereumTxHash()` uses `INS 0x09` with `P1 = 0x01` (on-device review); firmware
-1.6.1 rejects a standalone `P1 = 0x00`, so pass `display: true`.
+1.6.1 accepts no other `P1`, so pass `display: true` — `display: false` is rejected by
+the SDK before any APDU is sent.
 
 `session.path` is a five-word slot descriptor, not the derivation path. To show or log
 the path the device derives (and displays), convert it:

@@ -334,8 +334,28 @@ describe('RailgunSigner', () => {
       expect(transport.sentCommands).toHaveLength(0);
     });
 
-    it('signs Ethereum tx hashes in gated blind-signing mode', async () => {
+    it('rejects blind tx-hash signing on the RAILGUN profile before any APDU, even with allowBlind', async () => {
+      // Firmware 1.6.1 answers SIGN_TX_HASH P1=0x00 with 6a86 — fail on the host instead.
       signer = new RailgunSigner({ transport, account: 7 });
+
+      await expect(
+        signer.signEthereumTxHash(new Uint8Array(32).fill(0xab), { display: false, allowBlind: true }),
+      ).rejects.toMatchObject({
+        code: HWErrorCode.APP_VERSION_MISMATCH,
+        message: expect.stringContaining('P1=0x01'),
+      });
+      expect(transport.sentCommands).toHaveLength(0);
+    });
+
+    it('signs Ethereum tx hashes in gated blind-signing mode when the profile advertises it', async () => {
+      signer = new RailgunSigner({
+        transport,
+        account: 7,
+        profile: {
+          ...RAILGUN_PROFILE,
+          capabilities: { ...RAILGUN_PROFILE.capabilities, ethereumSigning: ['blind', 'clear'] },
+        },
+      });
       transport.enqueueResponse(ethereumSignatureResponse(0));
 
       const signature = await signer.signEthereumTxHash(

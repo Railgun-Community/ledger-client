@@ -15,6 +15,13 @@ project is pre-1.0 and experimental; expect breaking changes on minor versions.
 - **Explicit 7702 paths may write `W1`/`W2` hardened.** `1'` and `1` now name the same slot, as
   they do on the device; previously a hardened chainId word was rejected by the chain-scoping
   guard. A hardened chainId word that disagrees with the authorization chainId is still rejected.
+- **A no-display Ethereum `SIGN_TX_HASH` (`INS 0x09`, `P1 = 0x00`) fails on the host.** Firmware
+  1.6.1 signs a digest for the 7702 EOA only with on-device review (`P1 = 0x01`) and has no
+  armed/gated mode, so `RAILGUN_PROFILE` no longer advertises `'blind'` in `ethereumSigning`.
+  `signEthereumTxHash(hash, { display: false, allowBlind: true })` now throws
+  `APP_VERSION_MISMATCH` before any APDU is sent, instead of the device returning `0x6A86`.
+  RAILGUN transaction signing is untouched: `SIGN_HASH` (`INS 0x12`) still signs the hash of any
+  batch that is not clear-signed.
 
 ### Added
 

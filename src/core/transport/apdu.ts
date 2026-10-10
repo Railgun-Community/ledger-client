@@ -199,7 +199,7 @@ export const RailgunAppINS = {
   GET_ETHEREUM_PUBLIC_KEY: 0x07,
   /** Sign EIP-7702 authorization. Data: W0‖W1‖W2 (12B) + chainId(8B) + contract(20B) + nonce(8B). */
   SIGN_EIP7702_AUTHORIZATION: 0x08,
-  /** Sign Ethereum tx/message hash. Data: W0‖W1‖W2 (12B) + hash(32B). P1 0x01=display, 0x00=gated. */
+  /** Sign Ethereum tx/message hash. Data: W0‖W1‖W2 (12B) + hash(32B). Firmware 1.6.1 accepts only P1=0x01 (on-device review). */
   SIGN_ETHEREUM_TX_HASH: 0x09,
 
   // ─── FROST / MPC — UNSUPPORTED on current firmware (see CAPABILITY_STATUS) ──

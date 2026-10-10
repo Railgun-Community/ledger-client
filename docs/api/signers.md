@@ -88,11 +88,12 @@ the path the device actually derives.
 | `getEthereumAddress(display?)` | Derive the RAILGUN-app EOA address + public key. |
 | `prepareEthereumSigner(request)` | Preload/derive the EOA for a `{ railgunAccountIndex, chainId, ephemeralIndex }` session (binds later signatures to the same chain-scoped path). |
 | `signEip7702Authorization(request)` | Sign an EIP-7702 authorization (`INS 0x08`). Rejects an explicit `path` whose chainId word (W1) disagrees with the authorization `chainId`. |
-| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (clear signing); firmware requires `P1 = 0x01`, so standalone `display: false` is rejected. |
+| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (on-device review); firmware 1.6.1 accepts only `P1 = 0x01`, so `display: false` throws `APP_VERSION_MISMATCH` before any APDU is sent (`SIGN_BLIND_NOT_ALLOWED` without `allowBlind`). |
 | `get7702Signer(request, options?)` | Return an engine-compatible RelayAdapt7702 hooked signer. `request` = `{ chainId, ephemeralIndex, railgunAccountIndex? }` — all three path words are customizable (`railgunAccountIndex` defaults to the signer's account). |
 
-**Guidance:** prefer `display: true` (clear signing) so the device shows context; treat
-blind/hash-only signing (`display: false`) as an explicit, audited opt-in. For RAILGUN
+**Guidance:** use `display: true` so the device shows context. Blind/hash-only signing
+(`display: false`) is not available on `RAILGUN_PROFILE`; it stays an explicit, audited
+`allowBlind` opt-in for a custom profile that advertises `'blind'`. For RAILGUN
 signing, always pass `publicInputs` on the engine path so the hash is bound to the
 transaction it represents — see [architecture.md](../architecture.md).
 

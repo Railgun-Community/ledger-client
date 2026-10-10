@@ -24,7 +24,7 @@ describe('embedded Ethereum APDUs', () => {
       ethereumAddress: true,
       eip7702Authorization: true,
       ethereumTxHash: true,
-      ethereumSigning: ['blind', 'clear'],
+      ethereumSigning: ['clear'],
       viewingPublicKey: true,
       railgunAddress: true,
       railgunClearSign: true,
