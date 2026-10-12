@@ -8,6 +8,9 @@ import {
   buildSignEthereumTxHash,
   encodeBip32Path,
   encodeRailgunEthereumPathSuffix,
+  encodeRailgunEthereumPathSuffixFromBip32Path,
+  formatRailgunEip7702DerivationPath,
+  toRailgunEip7702DerivationPath,
   parseEthereumSignatureResponse,
 } from '../../src/core/transport/apdu.js';
 
@@ -21,7 +24,7 @@ describe('embedded Ethereum APDUs', () => {
       ethereumAddress: true,
       eip7702Authorization: true,
       ethereumTxHash: true,
-      ethereumSigning: ['blind', 'clear'],
+      ethereumSigning: ['clear'],
       viewingPublicKey: true,
       railgunAddress: true,
       railgunClearSign: true,
@@ -48,6 +51,30 @@ describe('embedded Ethereum APDUs', () => {
     })))).toBe(
       '0580001e16800007c0800000020000a4b100000007',
     );
+  });
+
+  it('maps a slot descriptor to the 7-level path the firmware derives', () => {
+    // Firmware 1.6.1: m/44'/60'/1984'/7702'/W0'/W1'/W2' — fixed prefix, all levels hardened.
+    const slot = buildRailgunEthereumBip32Path({ railgunAccountIndex: 2, chainId: 42161n, ephemeralIndex: 7 });
+    expect(toRailgunEip7702DerivationPath(slot)).toEqual([
+      0x8000_002c, 0x8000_003c, 0x8000_07c0, 0x8000_1e16,
+      0x8000_0002, 0x8000_a4b1, 0x8000_0007,
+    ]);
+    expect(formatRailgunEip7702DerivationPath(slot)).toBe("m/44'/60'/1984'/7702'/2'/42161'/7'");
+    expect(formatRailgunEip7702DerivationPath(buildRailgunEip7702Bip32Path())).toBe(
+      "m/44'/60'/1984'/7702'/0'/0'/0'",
+    );
+  });
+
+  it('treats hardened and unhardened slot words as the same slot', () => {
+    const plain = [0x8000_1e16, 0x8000_07c0, 0x8000_0002, 42161, 7];
+    const hardened = [0x8000_1e16, 0x8000_07c0, 0x8000_0002, 0x8000_a4b1, 0x8000_0007];
+    expect(hex(encodeRailgunEthereumPathSuffixFromBip32Path(hardened))).toBe('000000020000a4b100000007');
+    expect(hex(encodeRailgunEthereumPathSuffixFromBip32Path(hardened))).toBe(
+      hex(encodeRailgunEthereumPathSuffixFromBip32Path(plain)),
+    );
+    expect(toRailgunEip7702DerivationPath(hardened)).toEqual(toRailgunEip7702DerivationPath(plain));
+    expect(() => toRailgunEip7702DerivationPath([0x8000_002c, 0x8000_003c, 0])).toThrow(/exactly 5 components/);
   });
 
   it('derives a distinct chain-scoped 7702 path per chain (multi-chain, all words customizable)', () => {

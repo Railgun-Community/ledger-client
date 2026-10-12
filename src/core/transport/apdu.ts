@@ -43,13 +43,28 @@ export const RAILGUN_BIP32_PATH = [
   0x0000_0000, // 0
 ] as const;
 
-/** Default EIP-7702 path used by the embedded app: m/7702'/1984'/0'/0/0. */
+/**
+ * Default EIP-7702 *slot descriptor* `[7702', 1984', W0, W1, W2]` — NOT the path the
+ * device derives. Words 0–1 are client-side namespace markers that never reach the
+ * device; only `W0 ‖ W1 ‖ W2` travel on the wire (12-byte suffix). Firmware 1.6.1
+ * pins its own prefix and force-hardens all three host words, so the key lives at
+ * `m/44'/60'/1984'/7702'/W0'/W1'/W2'`. Use {@link toRailgunEip7702DerivationPath} /
+ * {@link formatRailgunEip7702DerivationPath} for the real BIP-32 path.
+ */
 export const RAILGUN_EIP7702_BIP32_PATH = [
-  0x8000_1e16, // 7702'
+  0x8000_1e16, // 7702' (marker, not sent)
+  0x8000_07c0, // 1984' (marker, not sent)
+  0x8000_0000, // W0
+  0x0000_0000, // W1
+  0x0000_0000, // W2
+] as const;
+
+/** Prefix firmware 1.6.1 pins on-device for every 7702 derivation: m/44'/60'/1984'/7702'. */
+export const RAILGUN_EIP7702_DERIVATION_PREFIX = [
+  0x8000_002c, // 44'
+  0x8000_003c, // 60'
   0x8000_07c0, // 1984'
-  0x8000_0000, // 0'
-  0x0000_0000, // 0
-  0x0000_0000, // 0
+  0x8000_1e16, // 7702'
 ] as const;
 
 export type RailgunEthereumPathRequest = {
@@ -120,16 +135,46 @@ export function encodeRailgunEthereumPathSuffix(request: RailgunEthereumPathRequ
   return data;
 }
 
-export function encodeRailgunEthereumPathSuffixFromBip32Path(path: readonly number[]): Uint8Array {
+/**
+ * Slot words `[W0, W1, W2]` of a 5-word 7702 slot descriptor, hardened bit cleared.
+ * The firmware forces that bit on every word, so `n` and `n'` name the same slot.
+ */
+function railgunEthereumSlotWords(path: readonly number[]): readonly [number, number, number] {
   if (path.length !== 5) {
     throw new Error(`RAILGUN Ethereum path must contain exactly 5 components, got ${String(path.length)}`);
   }
+  return [
+    (path[2] ?? 0) & 0x7fff_ffff,
+    (path[3] ?? 0) & 0x7fff_ffff,
+    (path[4] ?? 0) & 0x7fff_ffff,
+  ];
+}
+
+export function encodeRailgunEthereumPathSuffixFromBip32Path(path: readonly number[]): Uint8Array {
+  const [w0, w1, w2] = railgunEthereumSlotWords(path);
   const data = new Uint8Array(12);
   const view = new DataView(data.buffer);
-  view.setUint32(0, (path[2] ?? 0) & 0x7fff_ffff, false);
-  view.setUint32(4, path[3] ?? 0, false);
-  view.setUint32(8, path[4] ?? 0, false);
+  view.setUint32(0, w0, false);
+  view.setUint32(4, w1, false);
+  view.setUint32(8, w2, false);
   return data;
+}
+
+/**
+ * The BIP-32 path the device actually derives for a 5-word 7702 slot descriptor
+ * (e.g. a session's `path`): `m/44'/60'/1984'/7702'/W0'/W1'/W2'`, every level hardened.
+ */
+export function toRailgunEip7702DerivationPath(path: readonly number[]): readonly number[] {
+  return [
+    ...RAILGUN_EIP7702_DERIVATION_PREFIX,
+    ...railgunEthereumSlotWords(path).map((word) => 0x8000_0000 + word),
+  ];
+}
+
+/** {@link toRailgunEip7702DerivationPath} as a string, e.g. `m/44'/60'/1984'/7702'/0'/1'/0'`. */
+export function formatRailgunEip7702DerivationPath(path: readonly number[]): string {
+  const words = toRailgunEip7702DerivationPath(path).map((word) => `${String(word - 0x8000_0000)}'`);
+  return `m/${words.join('/')}`;
 }
 
 /** Instruction bytes for RAILGUN app commands. */
@@ -150,11 +195,11 @@ export const RailgunAppINS = {
 
   // ─── Ethereum / EIP-7702 — matched to current embedded app demo ──────
   // EIP-7702 (SIGN_EIP7702_AUTHORIZATION) is UNDER DEVELOPMENT — see CAPABILITY_STATUS.
-  /** Get secp256k1 public key. Data: address_index(4B BE). Response: 04 || x(32) || y(32). */
+  /** Get secp256k1 public key. Data: W0‖W1‖W2 (12B). Response: 04 || x(32) || y(32). */
   GET_ETHEREUM_PUBLIC_KEY: 0x07,
-  /** Sign EIP-7702 authorization. Data: path + chainId(8B) + contract(20B) + nonce(8B). */
+  /** Sign EIP-7702 authorization. Data: W0‖W1‖W2 (12B) + chainId(8B) + contract(20B) + nonce(8B). */
   SIGN_EIP7702_AUTHORIZATION: 0x08,
-  /** Sign Ethereum tx/message hash. Data: path + hash(32B). P1 0x01=display, 0x00=gated. */
+  /** Sign Ethereum tx/message hash. Data: W0‖W1‖W2 (12B) + hash(32B). Firmware 1.6.1 accepts only P1=0x01 (on-device review). */
   SIGN_ETHEREUM_TX_HASH: 0x09,
 
   // ─── FROST / MPC — UNSUPPORTED on current firmware (see CAPABILITY_STATUS) ──

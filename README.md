@@ -8,7 +8,7 @@ State-machine-driven hardware wallet connector for RAILGUN — Ledger-first, bro
 - Signs RAILGUN transactions (BabyJubjub EdDSA via custom Ledger app), with CLEAR_SIGN transact builders (experimental)
 - Reads the viewing public key and the canonical `0zk1…` address for on-device display/verify
 - Signs ETH transactions, messages, EIP-712 typed data, fixed shield ownership markers, and EIP-7702 authorizations
-- Preloads and signs with a caller-customizable, chain-scoped RAILGUN 7702 EOA path `m/7702'/1984'/account'/chainId'/ephemeralIndex'` (a distinct EOA per chain)
+- Preloads and signs with a caller-customizable, chain-scoped RAILGUN 7702 EOA path `m/44'/60'/1984'/7702'/account'/chainId'/ephemeralIndex'` (a distinct EOA per chain)
 - Installs sideloaded apps via SCP02/SCP03 secure channel
 - Exposes a `HardwareConnector` interface compatible with the RAILGUN engine
 - Drives its behavior through a pure finite state machine — no framework required
@@ -130,10 +130,12 @@ specific app builds.
 The SDK exposes the RAILGUN-app hardware path for EIP-7702 signer preload, authorization signing, and RelayAdapt7702 EIP-712 digest signing. The firmware derives Ethereum EOAs from a caller-chosen path:
 
 ```text
-m/7702'/1984'/account'/chainId'/ephemeralIndex'
+m/44'/60'/1984'/7702'/account'/chainId'/ephemeralIndex'
 ```
 
-The host sends the trailing three path words to the RAILGUN app as `W0(account) || W1(chainId) || W2(ephemeralIndex)`; the firmware hardens all three, derives the EOA, and signs against that same suffix for all 7702 operations. All three words are caller-customizable, and because `chainId` is one of them each chain derives a **distinct** EOA (chain-scoped — a wallet runs on many chains at once without reusing a 7702 address). Each word is a hardened index and must fit in 31 bits, so chains with `chainId >= 2**31` are rejected.
+The `m/44'/60'/1984'/7702'` prefix is pinned by the firmware and never travels on the wire. The host sends only the trailing three path words to the RAILGUN app as `W0(account) || W1(chainId) || W2(ephemeralIndex)`; the firmware hardens all three, derives the EOA, and signs against that same suffix for all 7702 operations.
+
+The SDK's `path` arrays (`RAILGUN_EIP7702_BIP32_PATH`, `buildRailgunEthereumBip32Path`, a session's `path`) are five-word *slot descriptors* `[7702', 1984', W0, W1, W2]`, not the derivation path. Use `toRailgunEip7702DerivationPath(path)` / `formatRailgunEip7702DerivationPath(path)` to get the real path, e.g. to match the device's "Path" screen. All three words are caller-customizable, and because `chainId` is one of them each chain derives a **distinct** EOA (chain-scoped — a wallet runs on many chains at once without reusing a 7702 address). Each word is a hardened index and must fit in 31 bits, so chains with `chainId >= 2**31` are rejected.
 
 | Operation | SDK API | RAILGUN APDU |
 |-----------|---------|--------------|
@@ -143,7 +145,7 @@ The host sends the trailing three path words to the RAILGUN app as `W0(account) 
 
 For RelayAdapt7702, build the EIP-712 digest host-side, sign the 32-byte digest through `signRailgunEthereumHash`, then recover the address and require it to match the preloaded signer session.
 
-This is RAILGUN-app blind/hash EIP-712 signing. The stock Ledger Ethereum app should not be used for the `m/7702'/1984'...` path; current device behavior rejects that custom namespace.
+This is RAILGUN-app hash signing: the device reviews the path and the 32-byte digest, not the decoded EIP-712 fields. Firmware 1.6.1 signs an Ethereum digest for the 7702 EOA only with on-device review (`display: true`); a `display: false` request is rejected by the SDK before any APDU is sent. RAILGUN transaction signing is a separate command and is not affected: `SIGN_HASH` (`INS 0x12`) still signs the hash of any batch that is not clear-signed.
 
 The simplest direct integration is to ask `RailgunSigner` for the engine-compatible signer:
 

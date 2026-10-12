@@ -54,6 +54,21 @@ describe('CLEAR_SIGN (0x11) builders — README 1×1 unshield golden vectors', (
     );
   });
 
+  it('CS_INIT appends the wallet source when given (53 bytes)', () => {
+    const walletSource = new Uint8Array(15).fill(0x5a);
+    const cmd = buildClearSignInit({ account: 0, merkleRoot: MERKLE_ROOT, nIn: 1, nOut: 1, walletSource });
+    expect(apduHex(cmd)).toBe(
+      'e011000035' + '00000000' + '11'.repeat(32) + '01' + '01' + '5a'.repeat(15),
+    );
+  });
+
+  it('CS_INIT rejects a wallet source that is not 15 bytes', () => {
+    expect(() => buildClearSignInit({ merkleRoot: MERKLE_ROOT, nIn: 1, nOut: 1, walletSource: new Uint8Array(16) }))
+      .toThrow(/walletSource/);
+    expect(() => buildClearSignInit({ merkleRoot: MERKLE_ROOT, nIn: 1, nOut: 1, walletSource: new Uint8Array(0) }))
+      .toThrow(/walletSource/);
+  });
+
   it('NULLIFIER reproduces the spec hex', () => {
     const cmd = buildClearSignNullifier(NULLIFIER);
     expect(cmd.p1).toBe(ClearSignP1.NULLIFIER);

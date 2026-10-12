@@ -3,6 +3,39 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.4.2 — 2026-10-12
+
+### Fixed
+
+- **The 7702 derivation path is described correctly.** Firmware 1.6.1 derives the 7702 EOA at
+  `m/44'/60'/1984'/7702'/W0'/W1'/W2'` — the prefix is pinned on-device and all three host words
+  are force-hardened. The docs and comments previously gave `m/7702'/1984'/…`. The wire format
+  and every derived address are unchanged: the SDK's five-word `path` arrays are slot
+  descriptors of which only `W0 ‖ W1 ‖ W2` are sent.
+- **Explicit 7702 paths may write `W1`/`W2` hardened.** `1'` and `1` now name the same slot, as
+  they do on the device; previously a hardened chainId word was rejected by the chain-scoping
+  guard. A hardened chainId word that disagrees with the authorization chainId is still rejected.
+- **A no-display Ethereum `SIGN_TX_HASH` (`INS 0x09`, `P1 = 0x00`) fails on the host.** Firmware
+  1.6.1 signs a digest for the 7702 EOA only with on-device review (`P1 = 0x01`) and has no
+  armed/gated mode, so `RAILGUN_PROFILE` no longer advertises `'blind'` in `ethereumSigning`.
+  `signEthereumTxHash(hash, { display: false, allowBlind: true })` now throws
+  `APP_VERSION_MISMATCH` before any APDU is sent, instead of the device returning `0x6A86`.
+  RAILGUN transaction signing is untouched: `SIGN_HASH` (`INS 0x12`) still signs the hash of any
+  batch that is not clear-signed.
+
+- **A single clear-sign session can carry the wallet source.** The device encrypts a 15-byte
+  wallet-source tag into a transfer's annotation data, which is part of the hash it signs.
+  `signClearSignTransact` only ever sent the 38-byte `CS_INIT`, which leaves the tag as 15 zero
+  bytes, so a host rebuilding the hash with a non-empty wallet source could not match the
+  device's message hash for a transfer. `ClearSignTransactRequest.walletSource` (and
+  `ClearSignInitRequest.walletSource`) now sends the 53-byte `CS_INIT` firmware 1.6.1 accepts.
+  Without it the 38-byte form is sent as before.
+
+### Added
+
+- `RAILGUN_EIP7702_DERIVATION_PREFIX`, `toRailgunEip7702DerivationPath(path)` and
+  `formatRailgunEip7702DerivationPath(path)` — the real BIP-32 path for a slot descriptor.
+
 ## 0.4.1 — 2026-08-21
 
 ### Fixed

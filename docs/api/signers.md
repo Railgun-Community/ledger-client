@@ -62,6 +62,11 @@ the EdDSA signature, the echoed message hash, and the raw per-output device resp
 | `signClearSignTransact(request)` | Clear-sign a single transact (n inputs, m outputs; `n,m ≤ 3`, `n+m ≤ 5`). |
 | `signClearSignMultiTransact(request)` | Clear-sign a multi-tx bundle (`txToken ≠ feeToken` → one signature per tx). |
 
+`request.walletSource` (15 bytes, optional on both) is the wallet-source tag the device encrypts
+into a transfer's annotation data. A host that rebuilds the bound-params hash must send the same
+bytes it uses, or the device's message hash will not match; omitted, the device uses 15 zero
+bytes. On a single transact it is sent as a 53-byte `CS_INIT` (the 38-byte form plus the tag).
+
 Both are also exposed on [`LedgerController`](./controller.md) (managed lifecycle). Splicing the
 returned output responses into the on-chain transact calldata (full engine integration) is not
 included.
@@ -69,23 +74,31 @@ included.
 ### Ethereum / EIP-7702 methods (under development)
 
 The RAILGUN app derives Ethereum EOAs from a **caller-chosen** path
-`m/7702'/1984'/account'/chainId'/ephemeralIndex'`. All three trailing words —
+`m/44'/60'/1984'/7702'/account'/chainId'/ephemeralIndex'` (the first four levels are pinned
+by the firmware and never sent). All three trailing words —
 `account` (W0), `chainId` (W1), `ephemeralIndex` (W2) — are settable, and because `chainId`
 is one of them, **each chain derives a distinct EOA** (chain-scoped: a wallet can run on many
 chains at once without reusing a 7702 address). Each word is a hardened index and must fit in
 31 bits, so chains with `chainId >= 2**31` are rejected. These methods are gated on the app's
 advertised capabilities and throw `APP_VERSION_MISMATCH` if unsupported.
 
+The `path` arrays these methods take and return are five-word *slot descriptors*
+`[7702', 1984', W0, W1, W2]`, not the derivation path: only `W0 ‖ W1 ‖ W2` reach the device,
+and a word may be written hardened or not (the firmware hardens all three either way).
+`toRailgunEip7702DerivationPath(path)` and `formatRailgunEip7702DerivationPath(path)` return
+the path the device actually derives.
+
 | Method | Purpose |
 |--------|---------|
 | `getEthereumAddress(display?)` | Derive the RAILGUN-app EOA address + public key. |
 | `prepareEthereumSigner(request)` | Preload/derive the EOA for a `{ railgunAccountIndex, chainId, ephemeralIndex }` session (binds later signatures to the same chain-scoped path). |
 | `signEip7702Authorization(request)` | Sign an EIP-7702 authorization (`INS 0x08`). Rejects an explicit `path` whose chainId word (W1) disagrees with the authorization `chainId`. |
-| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (clear signing); firmware requires `P1 = 0x01`, so standalone `display: false` is rejected. |
+| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (on-device review); firmware 1.6.1 accepts only `P1 = 0x01`, so `display: false` throws `APP_VERSION_MISMATCH` before any APDU is sent (`SIGN_BLIND_NOT_ALLOWED` without `allowBlind`). |
 | `get7702Signer(request, options?)` | Return an engine-compatible RelayAdapt7702 hooked signer. `request` = `{ chainId, ephemeralIndex, railgunAccountIndex? }` — all three path words are customizable (`railgunAccountIndex` defaults to the signer's account). |
 
-**Guidance:** prefer `display: true` (clear signing) so the device shows context; treat
-blind/hash-only signing (`display: false`) as an explicit, audited opt-in. For RAILGUN
+**Guidance:** use `display: true` so the device shows context. Blind/hash-only signing
+(`display: false`) is not available on `RAILGUN_PROFILE`; it stays an explicit, audited
+`allowBlind` opt-in for a custom profile that advertises `'blind'`. For RAILGUN
 signing, always pass `publicInputs` on the engine path so the hash is bound to the
 transaction it represents — see [architecture.md](../architecture.md).
 

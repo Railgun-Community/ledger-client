@@ -106,6 +106,45 @@ describe('RailgunSigner.signClearSignTransact', () => {
     ]);
   });
 
+  it('sends the wallet source in CS_INIT when the request carries one', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    transport.enqueueResponses([
+      ok(new Uint8Array(0)), // CS_INIT
+      ok(new Uint8Array(0)), // NULLIFIER
+      ok(new Uint8Array(0)), // BP_FIELDS
+      ok(new Uint8Array(239).fill(0x03)), // OUT_TRANSFER (239B)
+      ok(finalize129()), // FINALIZE
+    ]);
+
+    const signer = new RailgunSigner({ transport });
+    await signer.signClearSignTransact({
+      merkleRoot: new Uint8Array(32).fill(0x11),
+      nullifiers: [new Uint8Array(32).fill(0x22)],
+      boundParams: { treeNumber: 0, minGasPrice: 0n, unshield: false, chainId: 1n },
+      outputs: [{ kind: 'transfer', recipient0zk: `0zk1${'q'.repeat(123)}`, tokenHash: DAI_HASH, value: 7n }],
+      walletSource: new Uint8Array(15).fill(0x5a),
+    });
+
+    expect(hex(serializeApdu(transport.sentCommands[0]))).toBe(
+      'e011000035' + '00000000' + '11'.repeat(32) + '01' + '01' + '5a'.repeat(15),
+    );
+  });
+
+  it('rejects a wrong-length wallet source before touching the device', async () => {
+    const transport = new MockTransport();
+    await transport.connect();
+    const signer = new RailgunSigner({ transport });
+    await expect(signer.signClearSignTransact({
+      merkleRoot: new Uint8Array(32).fill(0x11),
+      nullifiers: [new Uint8Array(32).fill(0x22)],
+      boundParams: { treeNumber: 0, minGasPrice: 0n, unshield: false, chainId: 1n },
+      outputs: [{ kind: 'transfer', recipient0zk: `0zk1${'q'.repeat(123)}`, tokenHash: DAI_HASH, value: 7n }],
+      walletSource: new Uint8Array(14),
+    })).rejects.toThrow(/walletSource/);
+    expect(transport.sentCommands).toHaveLength(0);
+  });
+
   it('rejects an illegal shape before touching the device', async () => {
     const transport = new MockTransport();
     await transport.connect();
