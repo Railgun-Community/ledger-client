@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLedgerController } from '../../src/sdk/controller/ledger-controller.js';
 import { MockTransport } from '../integration/mock-transport.js';
-import { successResponse } from '../fixtures/apdu-responses.js';
+import { successResponse, signHashResponder } from '../fixtures/apdu-responses.js';
 import { RAILGUN_APP } from '../../src/core/device/app-registry.js';
 import { EthSigner, RAILGUN_SHIELD_MESSAGE } from '../../src/core/signers/eth-signer.js';
 import { HWError, HWErrorCode } from '../../src/core/errors.js';
@@ -78,15 +78,6 @@ function buildPublicKeyResponse(x: bigint, y: bigint): Uint8Array {
   return data;
 }
 
-function buildSignResponse(r8x: bigint, r8y: bigint, s: bigint): Uint8Array {
-  const data = new Uint8Array(97);
-  data[0] = 0x00; // prefix byte
-  writeBigint32BE(data, 1, r8x);
-  writeBigint32BE(data, 33, r8y);
-  writeBigint32BE(data, 65, s);
-  return data;
-}
-
 async function waitForState(
   getState: () => string,
   expected: string,
@@ -155,7 +146,7 @@ describe('createLedgerController', () => {
     const controller = createController();
     enqueueReadyResponses();
     transport.enqueueResponse(successResponse(buildAppVersionResponse('RAILGUN', '0.1.0')));
-    transport.enqueueResponse(successResponse(buildSignResponse(0n, 1n, 7n)));
+    transport.enqueueResponse(signHashResponder(0n, 1n, 7n));
 
     const signPromise = controller.sign(12345n);
     await waitForState(() => controller.getSnapshot().action, 'reviewing_sign');
@@ -186,7 +177,7 @@ describe('createLedgerController', () => {
     const controller = createController();
     enqueueReadyResponses();
     transport.enqueueResponse(successResponse(buildAppVersionResponse('RAILGUN', '0.1.0')));
-    transport.enqueueResponse(successResponse(buildSignResponse(0n, 1n, 7n)));
+    transport.enqueueResponse(signHashResponder(0n, 1n, 7n));
 
     const signPromise = controller.sign(12345n);
     await waitForState(() => controller.getSnapshot().action, 'reviewing_sign');

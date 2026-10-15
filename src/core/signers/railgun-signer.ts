@@ -563,27 +563,33 @@ export class RailgunSigner {
 
     const signature = parseSignResponse(response.data, this.profile.commands.sign.hasPrefix);
 
-    // Verify echoed hash matches what we sent (tamper detection)
+    // Verify echoed hash matches what we sent (tamper detection). A profile that
+    // echoes the hash must get it back: a response without the echo fails closed
+    // instead of silently skipping the check.
     if (this.profile.commands.sign.echoesHash) {
       const echoed = extractEchoedHash(response.data, this.profile.commands.sign.hasPrefix);
-      if (echoed !== null) {
-        let mismatch = false;
-        if (echoed.length !== hashBytes.length) {
-          mismatch = true;
-        } else {
-          for (let i = 0; i < echoed.length; i++) {
-            if (echoed[i] !== hashBytes[i]) {
-              mismatch = true;
-              break;
-            }
+      if (echoed === null) {
+        throw new HWError(
+          HWErrorCode.SIGN_INVALID_RESPONSE,
+          'Device sign response is missing the echoed hash this app profile returns',
+        );
+      }
+      let mismatch = false;
+      if (echoed.length !== hashBytes.length) {
+        mismatch = true;
+      } else {
+        for (let i = 0; i < echoed.length; i++) {
+          if (echoed[i] !== hashBytes[i]) {
+            mismatch = true;
+            break;
           }
         }
-        if (mismatch) {
-          throw new HWError(
-            HWErrorCode.SIGN_INVALID_RESPONSE,
-            'Device echoed hash does not match the hash that was sent',
-          );
-        }
+      }
+      if (mismatch) {
+        throw new HWError(
+          HWErrorCode.SIGN_INVALID_RESPONSE,
+          'Device echoed hash does not match the hash that was sent',
+        );
       }
     }
 

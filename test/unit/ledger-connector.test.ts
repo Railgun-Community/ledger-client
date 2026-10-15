@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createLedgerConnector } from '../../src/core/connector/ledger-connector.js';
 import type { HardwareConnector, LedgerConnectorConfig } from '../../src/core/connector/types.js';
 import { MockTransport } from '../integration/mock-transport.js';
-import { successResponse } from '../fixtures/apdu-responses.js';
+import { successResponse, signHashResponder } from '../fixtures/apdu-responses.js';
 import { HWError, HWErrorCode } from '../../src/core/errors.js';
 import { encodeErc20TokenHash } from '../../src/core/transport/clear-sign-apdu.js';
 
@@ -60,12 +60,8 @@ function appAndVersionResponse(name: string, version: string) {
  * Build a valid sign response with small values that pass field validation.
  */
 function validSignResponse() {
-  const data = new Uint8Array(97);
-  data[0] = 0x00; // prefix byte
   // R8 = (0, 1) — on the BabyJubjub curve; S = 7 (in-subgroup).
-  data[64] = 1; // R8.y = 1 (big-endian LSB); R8.x stays 0
-  data[96] = 7; // S = 7
-  return successResponse(data);
+  return signHashResponder(0n, 1n, 7n);
 }
 
 /**

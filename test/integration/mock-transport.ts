@@ -8,12 +8,15 @@
 import type { HWTransport, ApduCommand, ApduResponse } from '../../src/core/transport/types.js';
 import { StatusWord } from '../../src/core/transport/types.js';
 
+/** A queued reply: a fixed response, or a responder built from the command that was sent. */
+export type MockResponse = ApduResponse | ((command: ApduCommand) => ApduResponse);
+
 export class MockTransport implements HWTransport {
   readonly type = 'webhid' as const;
 
   private _connected = false;
   private _disconnectCallbacks: Array<() => void> = [];
-  private _responseQueue: ApduResponse[] = [];
+  private _responseQueue: MockResponse[] = [];
   private _sentCommands: ApduCommand[] = [];
 
   /** All commands sent through this transport. */
@@ -27,12 +30,12 @@ export class MockTransport implements HWTransport {
   }
 
   /** Enqueue a response to be returned on the next send(). */
-  enqueueResponse(response: ApduResponse): void {
+  enqueueResponse(response: MockResponse): void {
     this._responseQueue.push(response);
   }
 
   /** Enqueue multiple responses. */
-  enqueueResponses(responses: readonly ApduResponse[]): void {
+  enqueueResponses(responses: readonly MockResponse[]): void {
     this._responseQueue.push(...responses);
   }
 
@@ -78,7 +81,7 @@ export class MockTransport implements HWTransport {
       return { data: new Uint8Array(0), statusWord: StatusWord.INTERNAL_ERROR };
     }
 
-    return response;
+    return typeof response === 'function' ? response(command) : response;
   }
 
   async rawExchange(_apdu: Uint8Array): Promise<Uint8Array> {
@@ -87,6 +90,9 @@ export class MockTransport implements HWTransport {
     }
 
     const response = this._responseQueue.shift();
+    if (typeof response === 'function') {
+      throw new Error('MockTransport: rawExchange cannot run a command responder');
+    }
     const data = response?.data ?? new Uint8Array(0);
     const statusWord = response?.statusWord ?? StatusWord.INTERNAL_ERROR;
     const raw = new Uint8Array(data.length + 2);

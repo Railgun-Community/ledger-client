@@ -21,7 +21,7 @@ import type {
 import { RailgunSigner } from '../../src/core/signers/railgun-signer.js';
 import { createLedgerConnector } from '../../src/core/connector/ledger-connector.js';
 import { MockTransport } from './mock-transport.js';
-import { successResponse, errorResponse } from '../fixtures/apdu-responses.js';
+import { successResponse, errorResponse, signHashResponder } from '../fixtures/apdu-responses.js';
 import { StatusWord } from '../../src/core/transport/types.js';
 import { HWError, HWErrorCode } from '../../src/core/errors.js';
 
@@ -50,12 +50,7 @@ function appAndVersionResponse(name: string, version: string) {
 }
 
 function validSignResponse(r8x = 0n, r8y = 1n, s = 7n) {
-  const data = new Uint8Array(97);
-  data[0] = 0x00; // prefix byte
-  writeBE(data, 1, r8x);
-  writeBE(data, 33, r8y);
-  writeBE(data, 65, s);
-  return successResponse(data);
+  return signHashResponder(r8x, r8y, s);
 }
 
 function writeBE(buf: Uint8Array, offset: number, value: bigint) {
