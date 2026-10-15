@@ -14,10 +14,11 @@
  */
 
 import fs from 'node:fs';
+import { bundledAppPath } from './bundled-app.js';
 
 const TARGET_ARTIFACTS = {
-  flex: { apduFile: 'apps/flex/app.apdu', elfFile: 'apps/flex/app.elf' },
-  nanosp: { apduFile: 'apps/nanosp/app.apdu', elfFile: 'apps/nanosp/app.elf' },
+  flex: { apduFile: bundledAppPath('flex', 'app.apdu'), elfFile: bundledAppPath('flex', 'app.elf') },
+  nanosp: { apduFile: bundledAppPath('nanosp', 'app.apdu'), elfFile: bundledAppPath('nanosp', 'app.elf') },
 } as const;
 
 const args = parseArgs(process.argv.slice(2));
@@ -229,7 +230,7 @@ Examples:
   yarn install:app:flex
   yarn install:app:nanosp
   yarn install:app -- --target flex --scp
-  npx tsx scripts/install-app.ts --apduFile apps/nanosp/app.apdu --elfFile apps/nanosp/app.elf --scp
-  npx tsx scripts/install-app.ts --apduFile apps/nanosp/app.apdu --scp --rootKeyFile .certs/installer-root.key
+  npx tsx scripts/install-app.ts --apduFile apps/1.6.x/nanosp/0.0.2/app.apdu --elfFile apps/1.6.x/nanosp/0.0.2/app.elf --scp
+  npx tsx scripts/install-app.ts --apduFile apps/1.6.x/nanosp/0.0.2/app.apdu --scp --rootKeyFile .certs/installer-root.key
   `.trim());
 }

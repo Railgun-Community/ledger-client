@@ -10,18 +10,19 @@
  *
  * Usage:
  *   npx tsx scripts/test-install-verify.ts
- *   npx tsx scripts/test-install-verify.ts --apduFile apps/nanosp/app.apdu
- *   npx tsx scripts/test-install-verify.ts --apduFile apps/nanosp/app.apdu --elfFile apps/nanosp/app.elf
+ *   npx tsx scripts/test-install-verify.ts --apduFile apps/1.6.x/nanosp/0.0.2/app.apdu
+ *   npx tsx scripts/test-install-verify.ts --apduFile apps/1.6.x/nanosp/0.0.2/app.apdu --elfFile apps/1.6.x/nanosp/0.0.2/app.elf
  */
 
 import fs from 'node:fs';
 import { NodeHIDTransport } from '../src/core/transport/nodehid-transport.js';
 import { installApp, verifyInstalledApp } from '../src/core/installer/installer.js';
 import { extractAppName } from '../src/core/installer/apdu-parser.js';
+import { bundledAppPath } from './bundled-app.js';
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_APDU_PATH = 'apps/nanosp/app.apdu';
+const DEFAULT_APDU_PATH = bundledAppPath('nanosp', 'app.apdu');
 
 // ─── Arg parsing ──────────────────────────────────────────────────────────────
 
