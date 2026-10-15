@@ -59,8 +59,8 @@ the EdDSA signature, the echoed message hash, and the raw per-output device resp
 
 | Method | Purpose |
 |--------|---------|
-| `signClearSignTransact(request)` | Clear-sign a single transact (n inputs, m outputs; `n,m ≤ 3`, `n+m ≤ 5`). |
-| `signClearSignMultiTransact(request)` | Clear-sign a multi-tx bundle (`txToken ≠ feeToken` → one signature per tx). |
+| `signClearSignTransact(request)` | Clear-sign a single transact (n inputs, m outputs; `n ≤ 4`, `m ≤ 3`, `n+m ≤ 5`). |
+| `signClearSignMultiTransact(request)` | Clear-sign a multi-tx bundle (`txToken ≠ feeToken` → one signature per tx). Two transactions: tx 0 must be `[change?, transfer]` and tx 1 `[change?, broadcaster]`, neither sets `unshield`, and both share `chainId` and the adapt fields. Checked before any APDU. |
 
 `request.walletSource` (15 bytes, optional on both) is the wallet-source tag the device encrypts
 into a transfer's annotation data. A host that rebuilds the bound-params hash must send the same
@@ -93,7 +93,7 @@ the path the device actually derives.
 | `getEthereumAddress(display?)` | Derive the RAILGUN-app EOA address + public key. |
 | `prepareEthereumSigner(request)` | Preload/derive the EOA for a `{ railgunAccountIndex, chainId, ephemeralIndex }` session (binds later signatures to the same chain-scoped path). |
 | `signEip7702Authorization(request)` | Sign an EIP-7702 authorization (`INS 0x08`). Rejects an explicit `path` whose chainId word (W1) disagrees with the authorization `chainId`. |
-| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (on-device review); firmware 1.6.1 accepts only `P1 = 0x01`, so `display: false` throws `APP_VERSION_MISMATCH` before any APDU is sent (`SIGN_BLIND_NOT_ALLOWED` without `allowBlind`). |
+| `signEthereumTxHash(hash, options?)` | Sign a 32-byte Ethereum digest (`INS 0x09`). `options.display` defaults to `true` (on-device review); the RAILGUN app accepts only `P1 = 0x01`, so `display: false` throws `APP_VERSION_MISMATCH` before any APDU is sent (`SIGN_BLIND_NOT_ALLOWED` without `allowBlind`). |
 | `get7702Signer(request, options?)` | Return an engine-compatible RelayAdapt7702 hooked signer. `request` = `{ chainId, ephemeralIndex, railgunAccountIndex? }` — all three path words are customizable (`railgunAccountIndex` defaults to the signer's account). |
 
 **Guidance:** use `display: true` so the device shows context. Blind/hash-only signing

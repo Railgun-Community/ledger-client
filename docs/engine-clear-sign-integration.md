@@ -4,8 +4,9 @@ What `@railgun-community/engine` needs to do to sign RAILGUN transacts on a Ledg
 using **clear-signing** (the device shows recipients / tokens / amounts and signs on
 approval) instead of blind-signing a hash.
 
-**Status:** experimental. Requires RAILGUN firmware **1.6.1 (clear-sign-v1)** on the
-device. The ledger-client side is complete (this repo); the work below is the engine side.
+**Status:** experimental. Requires a clear-sign build of the RAILGUN app on the device —
+the production app **0.0.2** (bundled since ledger-client 0.4.3) or the earlier app 0.0.1
+build (for device OS 1.6.1). The ledger-client side is complete (this repo); the work below is the engine side.
 
 ---
 
@@ -57,7 +58,7 @@ single-tx case.
 type ClearSignTransactRequest = {
   readonly account?: number;              // default 0
   readonly merkleRoot: Uint8Array;        // 32 bytes
-  readonly nullifiers: readonly Uint8Array[];   // one 32-byte nullifier per input; n ∈ [1,3]
+  readonly nullifiers: readonly Uint8Array[];   // one 32-byte nullifier per input; n ∈ [1,4]
   readonly boundParams: ClearSignBpFieldsRequest;
   readonly outputs: readonly ClearSignOutput[];  // m ∈ [1,3]; sent in this order
 };
@@ -85,7 +86,7 @@ type ClearSignOutput =
 
 - **`tokenHash`** is the 32-byte token field: `12 zero bytes ‖ 20-byte ERC-20 address`.
   Helper: `encodeErc20TokenHash(address20) → Uint8Array(32)`.
-- **Shape limits:** `n, m ∈ [1,3]` and `n + m ≤ 5` (validated before any APDU is sent).
+- **Shape limits:** `n ∈ [1,4]`, `m ∈ [1,3]` and `n + m ≤ 5` (validated before any APDU is sent).
 - Constraints and field widths are all validated host-side up front — an invalid request
   throws before the device is touched.
 
@@ -152,14 +153,20 @@ Use `LedgerController.signClearSignMultiTransact({ transactions: [txA, txB] })` 
 It returns `signatures[]` (one per tx, same key) + `outputs[]` across both. The FINALIZE is
 256 B (two `R8x‖R8y‖S‖msgHash` quads).
 
+The device accepts only one dual-tx shape, and the client checks it before opening a session:
+- tx 0 outputs are `[change?, transfer]` and tx 1 outputs are `[change?, broadcaster]`
+  (at most one change per tx, never as the final output);
+- neither tx may set `boundParams.unshield`;
+- `chainId`, `adaptContract` and `adaptParams` must match across both txs.
+
 ---
 
 ## Open questions for the RAILGUN-HW / firmware team
 
 - Exact `OUT_*` tuple → on-chain calldata mapping (the note-ciphertext splice) — validate a
   clear-signed transact lands on-chain with matching commitments.
-- The `0xb007` status word (surfaced as a "CLEAR_SIGN session/state" error) — confirm its
-  precise meaning.
+- ~~The `0xb007` status word~~ — answered: it is the app's generic `SW_BAD_STATE`
+  (`src/sw.h`), surfaced as `StatusWord.BAD_STATE`.
 
 ## Fallback / rollout
 

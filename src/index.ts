@@ -168,7 +168,7 @@ export {
 } from './core/transport/apdu.js';
 export type { RailgunEthereumPathRequest, EthereumSignatureParts } from './core/transport/apdu.js';
 
-// ─── CLEAR_SIGN transact protocol (INS 0x11) — EXPERIMENTAL (firmware 1.6.1) ──
+// ─── CLEAR_SIGN transact protocol (INS 0x11) — EXPERIMENTAL (RAILGUN app 0.0.2) ──
 // CLEAR_SIGN transact signing: pure builders + shape validator + the
 // RailgunSigner / LedgerController orchestrators (single-tx + dual-tx). The
 // device-generated output responses are returned raw; splicing them into the

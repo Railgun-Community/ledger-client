@@ -1,7 +1,7 @@
 /**
  * CLEAR_SIGN transact protocol (INS 0x11) — pure APDU builders + shape validator.
  *
- * Firmware 1.6.1 clear-signs a RAILGUN transact through a stateful, multi-step
+ * The RAILGUN app clear-signs a RAILGUN transact through a stateful, multi-step
  * session where P1 selects the sub-command and P2 is always 0x00. The host
  * streams the transact shape (init), one nullifier per input, the bound-params
  * fields, then one APDU per output, and finally FINALIZE — at which point the
@@ -45,7 +45,8 @@ export const CLEAR_SIGN_MIN_GAS_PRICE_MAX = 1n << 48n;
 export const CLEAR_SIGN_OUTPUT_TYPE_TRANSFER = 0;
 
 /**
- * Per-output device response lengths, measured on firmware 1.6.1 clear-sign-v1.
+ * Per-output device response lengths, measured on app 0.0.1 (device OS 1.6.1) and
+ * unchanged in the app 0.0.2 handler source.
  * The device returns opaque ciphertext material the host later splices into the
  * on-chain transact calldata; the orchestrator length-checks and collects it raw.
  */
@@ -189,7 +190,7 @@ export type ClearSignUnshieldOutput = {
 /**
  * CS_INIT (P1 0x00): account(4) ‖ merkleRoot(32) ‖ nIn(1) ‖ nOut(1) [‖ walletSource(15)].
  *
- * Firmware 1.6.1 accepts exactly two lengths here: 38 bytes, which leaves the
+ * The app accepts exactly two single-tx lengths here: 38 bytes, which leaves the
  * wallet source as 15 zero bytes, and 53 bytes, which carries it. The 53-byte
  * form is sent only when `walletSource` is given.
  */

@@ -46,7 +46,7 @@ export const RAILGUN_BIP32_PATH = [
 /**
  * Default EIP-7702 *slot descriptor* `[7702', 1984', W0, W1, W2]` — NOT the path the
  * device derives. Words 0–1 are client-side namespace markers that never reach the
- * device; only `W0 ‖ W1 ‖ W2` travel on the wire (12-byte suffix). Firmware 1.6.1
+ * device; only `W0 ‖ W1 ‖ W2` travel on the wire (12-byte suffix). The RAILGUN app
  * pins its own prefix and force-hardens all three host words, so the key lives at
  * `m/44'/60'/1984'/7702'/W0'/W1'/W2'`. Use {@link toRailgunEip7702DerivationPath} /
  * {@link formatRailgunEip7702DerivationPath} for the real BIP-32 path.
@@ -59,7 +59,7 @@ export const RAILGUN_EIP7702_BIP32_PATH = [
   0x0000_0000, // W2
 ] as const;
 
-/** Prefix firmware 1.6.1 pins on-device for every 7702 derivation: m/44'/60'/1984'/7702'. */
+/** Prefix the RAILGUN app pins on-device for every 7702 derivation: m/44'/60'/1984'/7702'. */
 export const RAILGUN_EIP7702_DERIVATION_PREFIX = [
   0x8000_002c, // 44'
   0x8000_003c, // 60'
@@ -199,7 +199,7 @@ export const RailgunAppINS = {
   GET_ETHEREUM_PUBLIC_KEY: 0x07,
   /** Sign EIP-7702 authorization. Data: W0‖W1‖W2 (12B) + chainId(8B) + contract(20B) + nonce(8B). */
   SIGN_EIP7702_AUTHORIZATION: 0x08,
-  /** Sign Ethereum tx/message hash. Data: W0‖W1‖W2 (12B) + hash(32B). Firmware 1.6.1 accepts only P1=0x01 (on-device review). */
+  /** Sign Ethereum tx/message hash. Data: W0‖W1‖W2 (12B) + hash(32B). The RAILGUN app accepts only P1=0x01 (on-device review). */
   SIGN_ETHEREUM_TX_HASH: 0x09,
 
   // ─── FROST / MPC — UNSUPPORTED on current firmware (see CAPABILITY_STATUS) ──
@@ -328,11 +328,10 @@ export function buildSignHash(
  * Returns the viewing private key — 32 bytes.
  * Device displays a confirmation prompt.
  *
- * P1 stays `0x00` here: unlike the *public* key commands (spending pubkey 0x01,
+ * P1 must be `0x00`: unlike the *public* key commands (spending pubkey 0x01,
  * viewing pubkey 0x10) which require `P1 = 0x01`, the viewing-privkey export is
- * already gated behind its own on-device confirmation and does not vary on P1 —
- * device testing shows INS 0x13 ignores P1 (returns the key for both 0x00 and
- * 0x01). We send `0x00`.
+ * always gated behind its own on-device confirmation. App 0.0.1 ignored P1;
+ * app 0.0.2 rejects any other P1/P2 with `0x6A86`.
  * @param account - Account index (default 0).
  * @param profile - APDU profile (default RAILGUN_PROFILE).
  */

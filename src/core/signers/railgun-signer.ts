@@ -157,7 +157,7 @@ export type EthereumTxHashSignOptions = {
    * 32-byte digest with no on-screen context. Prefer clear signing.
    *
    * The opt-in only matters for a profile that advertises `'blind'` in
-   * `ethereumSigning`. `RAILGUN_PROFILE` (firmware 1.6.1) does not, so there a
+   * `ethereumSigning`. `RAILGUN_PROFILE` (the RAILGUN app) does not, so there a
    * display:false request is rejected before any APDU is sent.
    */
   readonly allowBlind?: boolean;

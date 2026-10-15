@@ -318,7 +318,7 @@ function artifactFor(target: 'nanosp' | 'flex', appVersion: string) {
 const attestation = buildKeyAttestation({
   privateKey: rootPrivateKey,
   identity: { name: 'Acme Wallet' },
-  artifacts: [artifactFor('nanosp', '1.6.1'), artifactFor('flex', '1.6.1')],
+  artifacts: [artifactFor('nanosp', '0.0.2'), artifactFor('flex', '0.0.2')],
 });
 ```
 
