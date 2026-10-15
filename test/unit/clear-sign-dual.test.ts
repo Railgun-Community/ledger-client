@@ -129,6 +129,63 @@ describe('CLEAR_SIGN dual-tx', () => {
     expect(transport.sentCommands).toHaveLength(0);
   });
 
+  describe('dual-tx output roles (checked before any APDU)', () => {
+    const transfer = { kind: 'transfer', recipient0zk: `0zk1${'q'.repeat(123)}`, tokenHash: DAI_HASH, value: 7n } as const;
+    const broadcaster = { kind: 'broadcaster', recipientMasterPublicKey: new Uint8Array(32).fill(0xaa), recipientViewingPublicKey: new Uint8Array(32).fill(0xbb), tokenHash: DAI_HASH, value: 3n } as const;
+    const unshield = { kind: 'unshield', recipientAddress: new Uint8Array(20).fill(0x99), tokenHash: DAI_HASH, value: 7n } as const;
+    const unshieldBp = { ...bp, unshield: true } as const;
+    type Outputs = Parameters<RailgunSigner['signClearSignMultiTransact']>[0]['transactions'][number]['outputs'];
+    type BoundParams = Parameters<RailgunSigner['signClearSignMultiTransact']>[0]['transactions'][number]['boundParams'];
+    const tx = (outputs: Outputs, boundParams: BoundParams = bp) => ({ merkleRoot: new Uint8Array(32), nullifiers: [new Uint8Array(32)], boundParams, outputs });
+
+    async function expectRejected(transactions: ReturnType<typeof tx>[], message: RegExp): Promise<void> {
+      const transport = new MockTransport();
+      await transport.connect();
+      const signer = new RailgunSigner({ transport });
+      await expect(signer.signClearSignMultiTransact({ transactions })).rejects.toThrow(message);
+      expect(transport.sentCommands).toHaveLength(0);
+    }
+
+    it('rejects an unshield as the final output of tx 0', async () => {
+      // The device accepts this but renders the 20-byte address as a 0zk "To" string.
+      await expectRejected([tx([change, unshield], unshieldBp), tx([broadcaster])], /tx 0 must be \[change\?, transfer\], got \[change, unshield\]/);
+    });
+
+    it('rejects a broadcaster in tx 0', async () => {
+      await expectRejected([tx([broadcaster, transfer]), tx([broadcaster])], /tx 0 must be/);
+    });
+
+    it('rejects a transfer or unshield in tx 1', async () => {
+      await expectRejected([tx([transfer]), tx([transfer, broadcaster])], /tx 1 must be/);
+      await expectRejected([tx([transfer]), tx([unshield, broadcaster], unshieldBp)], /tx 1 must be/);
+    });
+
+    it('rejects tx 1 not ending in the broadcaster', async () => {
+      await expectRejected([tx([transfer]), tx([change])], /tx 1 must be \[change\?, broadcaster\]/);
+    });
+
+    it('allows at most one change, and only before the final output', async () => {
+      // The device keeps one change slot per transaction (change_done).
+      await expectRejected([tx([change, change, transfer]), tx([broadcaster])], /tx 0 must be/);
+      await expectRejected([tx([transfer]), tx([change, change, broadcaster])], /tx 1 must be/);
+      await expectRejected([tx([transfer]), tx([broadcaster, broadcaster])], /tx 1 must be/);
+    });
+
+    it('rejects unshield set in either transaction', async () => {
+      // tx 1: the device would sign a fee transaction whose bound params say unshield.
+      await expectRejected([tx([transfer]), tx([broadcaster], unshieldBp)], /tx 1 may not set unshield/);
+      await expectRejected([tx([change, transfer], unshieldBp), tx([broadcaster])], /tx 0 may not set unshield/);
+    });
+
+    it('rejects differing chainIds or adapt fields across the transactions', async () => {
+      await expectRejected([tx([transfer]), tx([broadcaster], { ...bp, chainId: 137n })], /same chainId/);
+      await expectRejected(
+        [tx([transfer], { ...bp, adaptContract: new Uint8Array(20).fill(0x01) }), tx([broadcaster])],
+        /same adaptContract/,
+      );
+    });
+  });
+
   it('rejects more than 2 transactions (device CS_MAX_TXS = 2) before any APDU', async () => {
     const transport = new MockTransport();
     await transport.connect();

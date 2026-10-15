@@ -23,6 +23,7 @@ import {
   buildClearSignOutput,
   buildClearSignFinalize,
   buildClearSignInitMultiTx,
+  validateClearSignMultiTxRoles,
   validateClearSignShape,
   type ClearSignTransactRequest,
   type ClearSignMultiTransactRequest,
@@ -355,8 +356,10 @@ export class RailgunSigner {
     }
 
     // Pre-build the whole multi-tx session (the multi CS_INIT also enforces nTx <= 2
-    // and each sub-tx's field widths) so any illegal input throws before any APDU.
+    // and each sub-tx's field widths, and the role check pins tx 0 = value transfer,
+    // tx 1 = broadcaster fee) so any illegal input throws before any APDU.
     const initCommand = buildClearSignInitMultiTx({ ...request, account: request.account ?? this.account }, this.profile);
+    validateClearSignMultiTxRoles(request.transactions);
     const txPlans = request.transactions.map((tx) => ({
       nullifierCommands: tx.nullifiers.map((nullifier) => buildClearSignNullifier(nullifier, this.profile)),
       bpCommand: buildClearSignBpFields(tx.boundParams, this.profile),

@@ -156,21 +156,21 @@ describe('createLedgerConnector', () => {
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // CS_INIT (multi)
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx0 NULLIFIER
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx0 BP_FIELDS
-      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x01))); // tx0 OUT_CHANGE
+      transport.enqueueResponse(successResponse(new Uint8Array(239).fill(0x01))); // tx0 OUT_TRANSFER
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx1 NULLIFIER
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx1 BP_FIELDS
-      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x02))); // tx1 OUT_CHANGE
+      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x02))); // tx1 OUT_BROADCASTER
       transport.enqueueResponse(clearSignFinalize256()); // FINALIZE
 
       const result = await connector.signClearMultiTransact({
         transactions: [
-          { merkleRoot: new Uint8Array(32).fill(0x11), nullifiers: [new Uint8Array(32).fill(0x33)], boundParams: bp, outputs: [{ kind: 'change', tokenHash, value: 5n }] },
-          { merkleRoot: new Uint8Array(32).fill(0x22), nullifiers: [new Uint8Array(32).fill(0x44)], boundParams: bp, outputs: [{ kind: 'change', tokenHash, value: 9n }] },
+          { merkleRoot: new Uint8Array(32).fill(0x11), nullifiers: [new Uint8Array(32).fill(0x33)], boundParams: bp, outputs: [{ kind: 'transfer', recipient0zk: `0zk1${'q'.repeat(123)}`, tokenHash, value: 5n }] },
+          { merkleRoot: new Uint8Array(32).fill(0x22), nullifiers: [new Uint8Array(32).fill(0x44)], boundParams: bp, outputs: [{ kind: 'broadcaster', recipientMasterPublicKey: new Uint8Array(32).fill(0xaa), recipientViewingPublicKey: new Uint8Array(32).fill(0xbb), tokenHash, value: 9n }] },
         ],
       });
 
       expect(result.signatures.map((s) => s.signature.S)).toEqual([7n, 7n]);
-      expect(result.outputs.map((o) => o.kind)).toEqual(['change', 'change']);
+      expect(result.outputs.map((o) => o.kind)).toEqual(['transfer', 'broadcaster']);
     });
 
     it('throws when no app is open (dashboard)', async () => {
