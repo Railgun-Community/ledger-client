@@ -170,16 +170,20 @@ describe('validateClearSignShape', () => {
     expect(() => validateClearSignShape(1, 1)).not.toThrow();
     expect(() => validateClearSignShape(2, 3)).not.toThrow();
     expect(() => validateClearSignShape(3, 2)).not.toThrow();
+    // CS_MAX_INPUTS = 4: a 4-in / 1-out transact fits the 2+n+m ≤ 7 arity.
+    expect(() => validateClearSignShape(4, 1)).not.toThrow();
   });
 
   it('rejects n+m > 5', () => {
     expect(() => validateClearSignShape(3, 3)).toThrow(/n\+m/);
+    expect(() => validateClearSignShape(4, 2)).toThrow(/n\+m/);
   });
 
   it('rejects out-of-range n or m', () => {
-    expect(() => validateClearSignShape(4, 1)).toThrow(/\[1, 3\]/);
-    expect(() => validateClearSignShape(0, 1)).toThrow(/\[1, 3\]/);
-    expect(() => validateClearSignShape(1, 0)).toThrow(/\[1, 3\]/);
+    expect(() => validateClearSignShape(5, 1)).toThrow(/nIn .*\[1, 4\]/);
+    expect(() => validateClearSignShape(0, 1)).toThrow(/nIn .*\[1, 4\]/);
+    expect(() => validateClearSignShape(1, 0)).toThrow(/nOut .*\[1, 3\]/);
+    expect(() => validateClearSignShape(1, 4)).toThrow(/nOut .*\[1, 3\]/);
   });
 });
 

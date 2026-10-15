@@ -108,12 +108,13 @@ export function encodeErc20TokenHash(address: Uint8Array): Uint8Array {
 
 /**
  * Validate the transact (n inputs, m outputs) shape against the device limits:
- * n,m ∈ [1,3] and n+m ≤ 5 (the device Poseidon msgHash arity is 2+n+m ≤ 7).
+ * n ∈ [1,4] (CS_MAX_INPUTS), m ∈ [1,3] (CS_MAX_OUTPUTS) and n+m ≤ 5 (the device
+ * Poseidon msgHash arity is 2+n+m ≤ 7).
  */
 export function validateClearSignShape(nIn: number, nOut: number): void {
-  for (const [label, value] of [['nIn', nIn], ['nOut', nOut]] as const) {
-    if (!Number.isInteger(value) || value < 1 || value > 3) {
-      throw new Error(`CLEAR_SIGN ${label} must be an integer in [1, 3], got ${String(value)}`);
+  for (const [label, value, max] of [['nIn', nIn, 4], ['nOut', nOut, 3]] as const) {
+    if (!Number.isInteger(value) || value < 1 || value > max) {
+      throw new Error(`CLEAR_SIGN ${label} must be an integer in [1, ${String(max)}], got ${String(value)}`);
     }
   }
   if (nIn + nOut > 5) {
@@ -127,7 +128,7 @@ export type ClearSignInitRequest = {
   readonly account?: number;
   /** 32-byte merkle root. */
   readonly merkleRoot: Uint8Array;
-  /** Number of inputs (nullifiers), 1..3. */
+  /** Number of inputs (nullifiers), 1..4. */
   readonly nIn: number;
   /** Number of device outputs, 1..3. */
   readonly nOut: number;
@@ -364,7 +365,7 @@ export type ClearSignTransactRequest = {
   readonly account?: number;
   /** 32-byte merkle root. */
   readonly merkleRoot: Uint8Array;
-  /** One 32-byte nullifier per input (1..3). */
+  /** One 32-byte nullifier per input (1..4). */
   readonly nullifiers: readonly Uint8Array[];
   /** Bound-params fields (tree, minGasPrice, unshield, chainID, adapt*). */
   readonly boundParams: ClearSignBpFieldsRequest;
