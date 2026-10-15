@@ -21,12 +21,29 @@ export function statusWordToHWError(statusWord: number): HWError {
       return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Device is locked. Unlock and retry.');
     case StatusWord.APP_NOT_OPEN:
       return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Required app is not open on the device.');
-    case StatusWord.RAILGUN_CLEAR_SIGN_STATE:
-      // Best-effort — exact meaning unconfirmed with the firmware author.
+    case StatusWord.BAD_STATE:
       return new HWError(
         HWErrorCode.APDU_STATUS_ERROR,
-        'RAILGUN CLEAR_SIGN session/state error (SW 0xb007) — a sub-command was likely sent out of order or without an active session.',
+        'RAILGUN app state error (SW 0xb007) — the instruction arrived in the wrong state, e.g. a CLEAR_SIGN sub-command out of order or without an active session.',
       );
+    case StatusWord.SIGNATURE_FAIL:
+      return new HWError(
+        HWErrorCode.APDU_STATUS_ERROR,
+        'RAILGUN app signing failed on the device (SW 0xb008).',
+      );
+    case StatusWord.INVALID_DATA:
+      return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Device rejected the command data as malformed (SW 0x6a80).');
+    case StatusWord.WRONG_P1P2:
+      return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Device rejected the command parameters P1/P2 (SW 0x6a86).');
+    case StatusWord.WRONG_DATA_LENGTH:
+      return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Device rejected the command data length (SW 0x6a87).');
+    case StatusWord.INS_NOT_SUPPORTED:
+      return new HWError(
+        HWErrorCode.APDU_STATUS_ERROR,
+        'Instruction not supported by the open app (SW 0x6d00) — the app may be an older or debug-only build, or not the RAILGUN app.',
+      );
+    case StatusWord.CLA_NOT_SUPPORTED:
+      return new HWError(HWErrorCode.APDU_STATUS_ERROR, 'Instruction class not supported by the open app (SW 0x6e00).');
     default:
       return new HWError(
         HWErrorCode.APDU_STATUS_ERROR,
