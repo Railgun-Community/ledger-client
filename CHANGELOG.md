@@ -3,7 +3,7 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
-## 0.4.3 — unreleased
+## 0.4.3 — 2026-10-16
 
 ### Changed
 
