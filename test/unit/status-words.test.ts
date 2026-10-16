@@ -26,10 +26,30 @@ describe('statusWordToHWError', () => {
     expect(err.message).toContain('0x1234');
   });
 
-  it('maps the RAILGUN CLEAR_SIGN state SW (0xb007) to a clear message', () => {
-    const err = statusWordToHWError(StatusWord.RAILGUN_CLEAR_SIGN_STATE);
+  it('maps the RAILGUN app state SW (0xb007) to a clear message', () => {
+    expect(StatusWord.RAILGUN_CLEAR_SIGN_STATE).toBe(StatusWord.BAD_STATE);
+    const err = statusWordToHWError(StatusWord.BAD_STATE);
     expect(err.code).toBe(HWErrorCode.APDU_STATUS_ERROR);
+    expect(err.message).toContain('0xb007');
     expect(err.message).toContain('CLEAR_SIGN');
+  });
+
+  it('names each RAILGUN app status word in its message', () => {
+    // src/sw.h of the RAILGUN app.
+    const cases: [number, string][] = [
+      [0x6a80, '0x6a80'],
+      [0x6a86, '0x6a86'],
+      [0x6a87, '0x6a87'],
+      [0x6d00, '0x6d00'],
+      [0x6e00, '0x6e00'],
+      [0xb008, '0xb008'],
+    ];
+    for (const [sw, text] of cases) {
+      const err = statusWordToHWError(sw);
+      expect(err.code).toBe(HWErrorCode.APDU_STATUS_ERROR);
+      expect(err.message).toContain(text);
+      expect(err.message).not.toMatch(/^APDU error/);
+    }
   });
 });
 

@@ -13,20 +13,15 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-const TARGETS = ['nanosp', 'flex'] as const;
-type Target = typeof TARGETS[number];
-
-// Bump this when shipping a new app build. Artifacts are read from
-// `apps/{target}/{APP_VERSION}/{app.apdu,app.elf}`.
-const APP_VERSION = '1.6.1';
+import { BUNDLED_TARGETS, bundledAppPath, type BundledTarget } from './bundled-app.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 const outFile = resolve(repoRoot, 'src/core/installer/bundled-artifacts.generated.ts');
 
-function loadAsBase64(target: Target, file: 'app.apdu' | 'app.elf'): string {
-  const path = resolve(repoRoot, 'apps', target, APP_VERSION, file);
+// Artifacts are read from `apps/{DEVICE_OS}/{target}/{APP_VERSION}/` (scripts/bundled-app.ts).
+function loadAsBase64(target: BundledTarget, file: 'app.apdu' | 'app.elf'): string {
+  const path = resolve(repoRoot, bundledAppPath(target, file));
   return readFileSync(path).toString('base64');
 }
 
@@ -39,7 +34,7 @@ const lines: string[] = [
   'export const BUNDLED_ARTIFACTS_BASE64 = {',
 ];
 
-for (const target of TARGETS) {
+for (const target of BUNDLED_TARGETS) {
   const apdu = loadAsBase64(target, 'app.apdu');
   const elf = loadAsBase64(target, 'app.elf');
   lines.push(`  ${target}: {`);

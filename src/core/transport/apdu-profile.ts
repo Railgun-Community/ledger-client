@@ -102,7 +102,7 @@ export const RAILGUN_PROFILE: ApduProfile = {
     ethereumAddress: true,
     eip7702Authorization: true,
     ethereumTxHash: true,
-    // Firmware 1.6.1 rejects SIGN_TX_HASH P1=0x00 (6a86) and has no armed/gated mode,
+    // The RAILGUN app rejects SIGN_TX_HASH P1=0x00 (6a86) and has no armed/gated mode,
     // so blind Ethereum signing is not advertised.
     ethereumSigning: ['clear'],
     viewingPublicKey: true,

@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createLedgerConnector } from '../../src/core/connector/ledger-connector.js';
 import type { HardwareConnector, LedgerConnectorConfig } from '../../src/core/connector/types.js';
 import { MockTransport } from '../integration/mock-transport.js';
-import { successResponse } from '../fixtures/apdu-responses.js';
+import { successResponse, signHashResponder } from '../fixtures/apdu-responses.js';
 import { HWError, HWErrorCode } from '../../src/core/errors.js';
 import { encodeErc20TokenHash } from '../../src/core/transport/clear-sign-apdu.js';
 
@@ -60,12 +60,8 @@ function appAndVersionResponse(name: string, version: string) {
  * Build a valid sign response with small values that pass field validation.
  */
 function validSignResponse() {
-  const data = new Uint8Array(97);
-  data[0] = 0x00; // prefix byte
   // R8 = (0, 1) — on the BabyJubjub curve; S = 7 (in-subgroup).
-  data[64] = 1; // R8.y = 1 (big-endian LSB); R8.x stays 0
-  data[96] = 7; // S = 7
-  return successResponse(data);
+  return signHashResponder(0n, 1n, 7n);
 }
 
 /**
@@ -156,21 +152,21 @@ describe('createLedgerConnector', () => {
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // CS_INIT (multi)
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx0 NULLIFIER
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx0 BP_FIELDS
-      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x01))); // tx0 OUT_CHANGE
+      transport.enqueueResponse(successResponse(new Uint8Array(239).fill(0x01))); // tx0 OUT_TRANSFER
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx1 NULLIFIER
       transport.enqueueResponse(successResponse(new Uint8Array(0))); // tx1 BP_FIELDS
-      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x02))); // tx1 OUT_CHANGE
+      transport.enqueueResponse(successResponse(new Uint8Array(223).fill(0x02))); // tx1 OUT_BROADCASTER
       transport.enqueueResponse(clearSignFinalize256()); // FINALIZE
 
       const result = await connector.signClearMultiTransact({
         transactions: [
-          { merkleRoot: new Uint8Array(32).fill(0x11), nullifiers: [new Uint8Array(32).fill(0x33)], boundParams: bp, outputs: [{ kind: 'change', tokenHash, value: 5n }] },
-          { merkleRoot: new Uint8Array(32).fill(0x22), nullifiers: [new Uint8Array(32).fill(0x44)], boundParams: bp, outputs: [{ kind: 'change', tokenHash, value: 9n }] },
+          { merkleRoot: new Uint8Array(32).fill(0x11), nullifiers: [new Uint8Array(32).fill(0x33)], boundParams: bp, outputs: [{ kind: 'transfer', recipient0zk: `0zk1${'q'.repeat(123)}`, tokenHash, value: 5n }] },
+          { merkleRoot: new Uint8Array(32).fill(0x22), nullifiers: [new Uint8Array(32).fill(0x44)], boundParams: bp, outputs: [{ kind: 'broadcaster', recipientMasterPublicKey: new Uint8Array(32).fill(0xaa), recipientViewingPublicKey: new Uint8Array(32).fill(0xbb), tokenHash, value: 9n }] },
         ],
       });
 
       expect(result.signatures.map((s) => s.signature.S)).toEqual([7n, 7n]);
-      expect(result.outputs.map((o) => o.kind)).toEqual(['change', 'change']);
+      expect(result.outputs.map((o) => o.kind)).toEqual(['transfer', 'broadcaster']);
     });
 
     it('throws when no app is open (dashboard)', async () => {

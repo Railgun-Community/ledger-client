@@ -23,6 +23,7 @@ import {
   buildClearSignOutput,
   buildClearSignFinalize,
   buildClearSignInitMultiTx,
+  validateClearSignMultiTxRoles,
   validateClearSignShape,
   type ClearSignTransactRequest,
   type ClearSignMultiTransactRequest,
@@ -156,7 +157,7 @@ export type EthereumTxHashSignOptions = {
    * 32-byte digest with no on-screen context. Prefer clear signing.
    *
    * The opt-in only matters for a profile that advertises `'blind'` in
-   * `ethereumSigning`. `RAILGUN_PROFILE` (firmware 1.6.1) does not, so there a
+   * `ethereumSigning`. `RAILGUN_PROFILE` (the RAILGUN app) does not, so there a
    * display:false request is rejected before any APDU is sent.
    */
   readonly allowBlind?: boolean;
@@ -355,8 +356,10 @@ export class RailgunSigner {
     }
 
     // Pre-build the whole multi-tx session (the multi CS_INIT also enforces nTx <= 2
-    // and each sub-tx's field widths) so any illegal input throws before any APDU.
+    // and each sub-tx's field widths, and the role check pins tx 0 = value transfer,
+    // tx 1 = broadcaster fee) so any illegal input throws before any APDU.
     const initCommand = buildClearSignInitMultiTx({ ...request, account: request.account ?? this.account }, this.profile);
+    validateClearSignMultiTxRoles(request.transactions);
     const txPlans = request.transactions.map((tx) => ({
       nullifierCommands: tx.nullifiers.map((nullifier) => buildClearSignNullifier(nullifier, this.profile)),
       bpCommand: buildClearSignBpFields(tx.boundParams, this.profile),
@@ -560,27 +563,33 @@ export class RailgunSigner {
 
     const signature = parseSignResponse(response.data, this.profile.commands.sign.hasPrefix);
 
-    // Verify echoed hash matches what we sent (tamper detection)
+    // Verify echoed hash matches what we sent (tamper detection). A profile that
+    // echoes the hash must get it back: a response without the echo fails closed
+    // instead of silently skipping the check.
     if (this.profile.commands.sign.echoesHash) {
       const echoed = extractEchoedHash(response.data, this.profile.commands.sign.hasPrefix);
-      if (echoed !== null) {
-        let mismatch = false;
-        if (echoed.length !== hashBytes.length) {
-          mismatch = true;
-        } else {
-          for (let i = 0; i < echoed.length; i++) {
-            if (echoed[i] !== hashBytes[i]) {
-              mismatch = true;
-              break;
-            }
+      if (echoed === null) {
+        throw new HWError(
+          HWErrorCode.SIGN_INVALID_RESPONSE,
+          'Device sign response is missing the echoed hash this app profile returns',
+        );
+      }
+      let mismatch = false;
+      if (echoed.length !== hashBytes.length) {
+        mismatch = true;
+      } else {
+        for (let i = 0; i < echoed.length; i++) {
+          if (echoed[i] !== hashBytes[i]) {
+            mismatch = true;
+            break;
           }
         }
-        if (mismatch) {
-          throw new HWError(
-            HWErrorCode.SIGN_INVALID_RESPONSE,
-            'Device echoed hash does not match the hash that was sent',
-          );
-        }
+      }
+      if (mismatch) {
+        throw new HWError(
+          HWErrorCode.SIGN_INVALID_RESPONSE,
+          'Device echoed hash does not match the hash that was sent',
+        );
       }
     }
 

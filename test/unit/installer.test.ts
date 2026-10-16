@@ -20,6 +20,7 @@ import {
 } from '../../src/core/installer/crypto.js';
 import { ScpV2Session, ScpV3Session } from '../../src/core/installer/scp.js';
 import { loadBundledInstallArtifact } from '../../src/core/installer/bundled-artifacts.js';
+import { bundledAppPath } from '../../scripts/bundled-app.js';
 import {
   TRANSIENT_STATUS_WORDS,
   STATUS_HINTS,
@@ -157,11 +158,11 @@ B001000000
     it('should produce consistent hash for the real APDU file', async () => {
       const { readFileSync } = await import('node:fs');
       const { resolve } = await import('node:path');
-      const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
+      const apduData = readFileSync(resolve(__dirname, '../..', bundledAppPath('nanosp', 'app.apdu')), 'utf-8');
       const hash = computeCodeHash(apduData);
       expect(hash).toBeDefined();
-      // Snapshot: SHA-256 of code segments from the real APDU file (firmware 1.6.1 clear-sign-v1)
-      expect(hash).toBe('aacf401b91474bff1152e1830e4250381dfd64f81492e86794ebf910dde6bc02');
+      // Snapshot: SHA-256 of code segments from the real APDU file (RAILGUN app 0.0.2)
+      expect(hash).toBe('ded7a757e6bb52e7400e1871cb5626c6cdf4f0bd1a6422349cdf89c0f29665b7');
     });
   });
 
@@ -196,17 +197,17 @@ B001000000
     it('should produce the correct BOLOS app hash for the real APDU file', async () => {
       const { readFileSync } = await import('node:fs');
       const { resolve } = await import('node:path');
-      const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
+      const apduData = readFileSync(resolve(__dirname, '../..', bundledAppPath('nanosp', 'app.apdu')), 'utf-8');
       const hash = computeAppHash(apduData, NANO_SP_TARGET_ID);
       expect(hash).toBeDefined();
-      // Snapshot: BOLOS "Application full hash" = SHA-256(targetId_BE32 + createAppParams + code_data) (fw 1.6.1 clear-sign-v1)
-      expect(hash).toBe('693bca4b867beffd589bf16385d5147a4ee91ee489531e76cd9f1ef96df30fc6');
+      // Snapshot: BOLOS "Application full hash" = SHA-256(targetId_BE32 + createAppParams + code_data) (RAILGUN app 0.0.2)
+      expect(hash).toBe('2999f79017c78c3162d417f29aaafab81c8c8f83e45a620ae558169eea31facd');
     });
 
     it('should differ when targetId changes', async () => {
       const { readFileSync } = await import('node:fs');
       const { resolve } = await import('node:path');
-      const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
+      const apduData = readFileSync(resolve(__dirname, '../..', bundledAppPath('nanosp', 'app.apdu')), 'utf-8');
       const hashNanoSP = computeAppHash(apduData, NANO_SP_TARGET_ID);
       const hashStax = computeAppHash(apduData, 0x33200004);
       expect(hashNanoSP).toBeDefined();
@@ -251,17 +252,17 @@ B001000000
     it('should produce the correct BOLOS Code ID for the real APDU file', async () => {
       const { readFileSync } = await import('node:fs');
       const { resolve } = await import('node:path');
-      const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
+      const apduData = readFileSync(resolve(__dirname, '../..', bundledAppPath('nanosp', 'app.apdu')), 'utf-8');
       const codeId = computeCodeId(apduData);
       expect(codeId).toBeDefined();
-      // Snapshot: BOLOS Code ID = SHA-256(code + data), excluding install_params. (fw 1.6.1 clear-sign-v1)
-      expect(codeId).toBe('908ca6b59dccca7b7511fe05d9aa33d53a51ea4e3f25adab850b5ea9b3d56630');
+      // Snapshot: BOLOS Code ID = SHA-256(code + data), excluding install_params. (RAILGUN app 0.0.2)
+      expect(codeId).toBe('075e8c513a6975aad076652b05f5f1d931eb523e8472a6fb17a032f4b973a074');
     });
 
     it('should differ from computeCodeHash for the real APDU file', async () => {
       const { readFileSync } = await import('node:fs');
       const { resolve } = await import('node:path');
-      const apduData = readFileSync(resolve(__dirname, '../../apps/nanosp/app.apdu'), 'utf-8');
+      const apduData = readFileSync(resolve(__dirname, '../..', bundledAppPath('nanosp', 'app.apdu')), 'utf-8');
       const codeId = computeCodeId(apduData);
       const codeHash = computeCodeHash(apduData);
       expect(codeId).toBeDefined();
@@ -273,32 +274,47 @@ B001000000
 });
 
 describe('Bundled install artifacts', () => {
-  it('keeps top-level and versioned install bundles in sync', async () => {
+  it('lays the bundles out as apps/{device OS}/{target}/{app version}', () => {
+    expect(bundledAppPath('flex', 'app.elf')).toBe('apps/1.6.x/flex/0.0.2/app.elf');
+    expect(bundledAppPath('nanosp', 'app.apdu')).toBe('apps/1.6.x/nanosp/0.0.2/app.apdu');
+  });
+
+  it('ships the RAILGUN app 0.0.2 release binaries byte for byte', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
+    const { createHash } = await import('node:crypto');
+    // From the RAILGUN app 0.0.2 release's SHA256SUMS. The release names its files for the
+    // device OS they load on (app_nanosp_v1.6.0.*, app_flex_v1.6.0.*), not the app version.
+    const releaseSha256 = {
+      nanosp: {
+        apdu: '7878c839846c9328a95151e4778d1b951f93a26e444cb413924eb39d5563436c',
+        elf: '31f77d794cf3fe81a87b81d27574ade400ae52a95e8a024af030ceecb368022f',
+      },
+      flex: {
+        apdu: 'bce4d7dd5eda35475bc41df7f294f53573856e8da305188738255af83a4218bb',
+        elf: 'aebaca293ff810ec3c6bfa36b60979c3fe66ddc56a01ab50430a73b7729fc365',
+      },
+    } as const;
 
     for (const target of ['nanosp', 'flex'] as const) {
-      const topLevelApdu = readFileSync(resolve(__dirname, `../../apps/${target}/app.apdu`));
-      const versionedApdu = readFileSync(resolve(__dirname, `../../apps/${target}/1.6.1/app.apdu`));
-      const topLevelElf = readFileSync(resolve(__dirname, `../../apps/${target}/app.elf`));
-      const versionedElf = readFileSync(resolve(__dirname, `../../apps/${target}/1.6.1/app.elf`));
-
-      expect(versionedApdu.equals(topLevelApdu)).toBe(true);
-      expect(versionedElf.equals(topLevelElf)).toBe(true);
+      for (const file of ['apdu', 'elf'] as const) {
+        const bytes = readFileSync(resolve(__dirname, '../..', bundledAppPath(target, `app.${file}`)));
+        expect(createHash('sha256').update(bytes).digest('hex')).toBe(releaseSha256[target][file]);
+      }
     }
   });
 
-  it('embeds the same install bundles used by the mock app', async () => {
+  it('embeds the bundled install files', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
 
     for (const target of ['nanosp', 'flex'] as const) {
       const artifact = loadBundledInstallArtifact(target);
-      const topLevelApdu = readFileSync(resolve(__dirname, `../../apps/${target}/app.apdu`), 'utf8');
-      const topLevelElf = readFileSync(resolve(__dirname, `../../apps/${target}/app.elf`));
+      const apdu = readFileSync(resolve(__dirname, '../..', bundledAppPath(target, 'app.apdu')), 'utf8');
+      const elf = readFileSync(resolve(__dirname, '../..', bundledAppPath(target, 'app.elf')));
 
-      expect(artifact.apduData).toBe(topLevelApdu);
-      expect(Buffer.from(artifact.elfData).equals(topLevelElf)).toBe(true);
+      expect(artifact.apduData).toBe(apdu);
+      expect(Buffer.from(artifact.elfData).equals(elf)).toBe(true);
     }
   });
 });

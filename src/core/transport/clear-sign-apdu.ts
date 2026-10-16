@@ -1,7 +1,7 @@
 /**
  * CLEAR_SIGN transact protocol (INS 0x11) — pure APDU builders + shape validator.
  *
- * Firmware 1.6.1 clear-signs a RAILGUN transact through a stateful, multi-step
+ * The RAILGUN app clear-signs a RAILGUN transact through a stateful, multi-step
  * session where P1 selects the sub-command and P2 is always 0x00. The host
  * streams the transact shape (init), one nullifier per input, the bound-params
  * fields, then one APDU per output, and finally FINALIZE — at which point the
@@ -45,7 +45,8 @@ export const CLEAR_SIGN_MIN_GAS_PRICE_MAX = 1n << 48n;
 export const CLEAR_SIGN_OUTPUT_TYPE_TRANSFER = 0;
 
 /**
- * Per-output device response lengths, measured on firmware 1.6.1 clear-sign-v1.
+ * Per-output device response lengths, measured on app 0.0.1 (device OS 1.6.1) and
+ * unchanged in the app 0.0.2 handler source.
  * The device returns opaque ciphertext material the host later splices into the
  * on-chain transact calldata; the orchestrator length-checks and collects it raw.
  */
@@ -108,12 +109,13 @@ export function encodeErc20TokenHash(address: Uint8Array): Uint8Array {
 
 /**
  * Validate the transact (n inputs, m outputs) shape against the device limits:
- * n,m ∈ [1,3] and n+m ≤ 5 (the device Poseidon msgHash arity is 2+n+m ≤ 7).
+ * n ∈ [1,4] (CS_MAX_INPUTS), m ∈ [1,3] (CS_MAX_OUTPUTS) and n+m ≤ 5 (the device
+ * Poseidon msgHash arity is 2+n+m ≤ 7).
  */
 export function validateClearSignShape(nIn: number, nOut: number): void {
-  for (const [label, value] of [['nIn', nIn], ['nOut', nOut]] as const) {
-    if (!Number.isInteger(value) || value < 1 || value > 3) {
-      throw new Error(`CLEAR_SIGN ${label} must be an integer in [1, 3], got ${String(value)}`);
+  for (const [label, value, max] of [['nIn', nIn, 4], ['nOut', nOut, 3]] as const) {
+    if (!Number.isInteger(value) || value < 1 || value > max) {
+      throw new Error(`CLEAR_SIGN ${label} must be an integer in [1, ${String(max)}], got ${String(value)}`);
     }
   }
   if (nIn + nOut > 5) {
@@ -127,7 +129,7 @@ export type ClearSignInitRequest = {
   readonly account?: number;
   /** 32-byte merkle root. */
   readonly merkleRoot: Uint8Array;
-  /** Number of inputs (nullifiers), 1..3. */
+  /** Number of inputs (nullifiers), 1..4. */
   readonly nIn: number;
   /** Number of device outputs, 1..3. */
   readonly nOut: number;
@@ -188,7 +190,7 @@ export type ClearSignUnshieldOutput = {
 /**
  * CS_INIT (P1 0x00): account(4) ‖ merkleRoot(32) ‖ nIn(1) ‖ nOut(1) [‖ walletSource(15)].
  *
- * Firmware 1.6.1 accepts exactly two lengths here: 38 bytes, which leaves the
+ * The app accepts exactly two single-tx lengths here: 38 bytes, which leaves the
  * wallet source as 15 zero bytes, and 53 bytes, which carries it. The 53-byte
  * form is sent only when `walletSource` is given.
  */
@@ -364,7 +366,7 @@ export type ClearSignTransactRequest = {
   readonly account?: number;
   /** 32-byte merkle root. */
   readonly merkleRoot: Uint8Array;
-  /** One 32-byte nullifier per input (1..3). */
+  /** One 32-byte nullifier per input (1..4). */
   readonly nullifiers: readonly Uint8Array[];
   /** Bound-params fields (tree, minGasPrice, unshield, chainID, adapt*). */
   readonly boundParams: ClearSignBpFieldsRequest;
@@ -485,6 +487,58 @@ export function buildClearSignInitMultiTx(
     ...perTx,
   );
   return { cla: profile.cla, ins: clearSignIns(profile), p1: ClearSignP1.INIT, p2: 0, data };
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((value, i) => value === b[i]);
+}
+
+/**
+ * Check the output roles of a dual-tx (nTx = 2) session before any APDU is sent.
+ *
+ * The device runs one review for both transactions: tx 0 is the value transfer
+ * and must be `[change?, transfer]`, tx 1 pays the broadcaster fee and must be
+ * `[change?, broadcaster]` — at most one change per transaction, never final.
+ * The device rejects most other shapes mid-session (0xB007), but not all: it
+ * accepts an unshield as tx 0's final output and then shows its 20-byte address
+ * as a 0zk "To" string, it signs a fee transaction whose bound params say
+ * unshield, and it shows only tx 1's chainId. So the host also requires
+ * `unshield: false` on both transactions and a shared chainId. The adapt fields
+ * must match too (the device compares them across transactions).
+ */
+export function validateClearSignMultiTxRoles(transactions: readonly ClearSignSubTransact[]): void {
+  if (transactions.length !== 2) return;
+  const [valueTx, feeTx] = transactions as readonly [ClearSignSubTransact, ClearSignSubTransact];
+
+  const roles = [
+    [valueTx, 0, 'transfer'],
+    [feeTx, 1, 'broadcaster'],
+  ] as const;
+  for (const [tx, index, finalKind] of roles) {
+    const kinds = tx.outputs.map((output) => output.kind);
+    const last = kinds[kinds.length - 1];
+    const leading = kinds.slice(0, -1);
+    if (last !== finalKind || leading.length > 1 || leading.some((kind) => kind !== 'change')) {
+      throw new Error(
+        `CLEAR_SIGN dual-tx: tx ${String(index)} must be [change?, ${finalKind}], got [${kinds.join(', ')}]`,
+      );
+    }
+    if (tx.boundParams.unshield) {
+      throw new Error(`CLEAR_SIGN dual-tx: tx ${String(index)} may not set unshield`);
+    }
+  }
+
+  if (valueTx.boundParams.chainId !== feeTx.boundParams.chainId) {
+    throw new Error('CLEAR_SIGN dual-tx: both transactions must use the same chainId');
+  }
+  const zero20 = new Uint8Array(20);
+  const zero32 = new Uint8Array(32);
+  if (
+    !sameBytes(valueTx.boundParams.adaptContract ?? zero20, feeTx.boundParams.adaptContract ?? zero20)
+    || !sameBytes(valueTx.boundParams.adaptParams ?? zero32, feeTx.boundParams.adaptParams ?? zero32)
+  ) {
+    throw new Error('CLEAR_SIGN dual-tx: both transactions must use the same adaptContract and adaptParams');
+  }
 }
 
 function encodeAscii127(value: string): Uint8Array {

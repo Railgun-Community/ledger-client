@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RailgunSigner } from '../../src/core/signers/railgun-signer.js';
 import { MockTransport } from '../integration/mock-transport.js';
-import { successResponse, errorResponse } from '../fixtures/apdu-responses.js';
+import { successResponse, errorResponse, signHashResponder } from '../fixtures/apdu-responses.js';
 import { StatusWord } from '../../src/core/transport/types.js';
 import { RAILGUN_CLA, RailgunAppINS } from '../../src/core/transport/apdu.js';
 import { HWError, HWErrorCode } from '../../src/core/errors.js';
@@ -26,16 +26,11 @@ function publicKeyResponse(x: bigint, y: bigint) {
 }
 
 /**
- * Build a valid sign response: prefix(1B) + R8.x(32B) + R8.y(32B) + S(32B).
+ * Build a valid sign response (the app's 129-byte reply, echoing the sent hash).
  * Values must be within BabyJubjub field/subgroup bounds.
  */
 function signResponse(r8x: bigint, r8y: bigint, s: bigint) {
-  const data = new Uint8Array(97);
-  data[0] = 0x00; // prefix byte
-  writeBigint32BE(data, 1, r8x);
-  writeBigint32BE(data, 33, r8y);
-  writeBigint32BE(data, 65, s);
-  return successResponse(data);
+  return signHashResponder(r8x, r8y, s);
 }
 
 function ethereumSignatureResponse(yParity: number) {
@@ -447,6 +442,30 @@ describe('RailgunSigner', () => {
     it('throws on truncated sign response', async () => {
       transport.enqueueResponse(successResponse(new Uint8Array(64)));
       await expect(signer.sign(1n)).rejects.toThrow(HWError);
+    });
+
+    it('fails closed when the response omits the echoed hash', async () => {
+      // 97 bytes = sigLen ‖ R8 ‖ S with no echo: the tamper check cannot run.
+      const noEcho = new Uint8Array(97);
+      noEcho[0] = 0x60;
+      noEcho[64] = 1;
+      noEcho[96] = 7;
+      transport.enqueueResponse(successResponse(noEcho));
+      await expect(signer.sign(1n)).rejects.toMatchObject({
+        code: HWErrorCode.SIGN_INVALID_RESPONSE,
+        message: expect.stringMatching(/missing the echoed hash/),
+      });
+    });
+
+    it('rejects a response whose echoed hash differs from the hash sent', async () => {
+      const respond = signResponse(SMALL_R8X, SMALL_R8Y, SMALL_S);
+      transport.enqueueResponse((command) => {
+        const response = respond(command);
+        const data = response.data.slice();
+        data[128] ^= 0x01;
+        return { ...response, data };
+      });
+      await expect(signer.sign(1n)).rejects.toThrow(/does not match the hash that was sent/);
     });
 
     it('throws on negative hash', async () => {

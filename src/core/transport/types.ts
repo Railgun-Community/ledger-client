@@ -31,9 +31,15 @@ export type ApduResponse = {
 export const StatusWord = {
   SUCCESS: 0x9000,
   USER_REJECTED: 0x6985,
+  /** ISO 7816 wrong length. The RAILGUN app answers a bad `Lc` with {@link StatusWord.WRONG_DATA_LENGTH}. */
   WRONG_LENGTH: 0x6700,
   INVALID_DATA: 0x6a80,
+  /** ISO 7816 wrong P1/P2. The RAILGUN app answers a bad P1/P2 with {@link StatusWord.WRONG_P1P2}. */
   INVALID_P1P2: 0x6b00,
+  /** RAILGUN app `SW_WRONG_P1P2`: invalid P1/P2. */
+  WRONG_P1P2: 0x6a86,
+  /** RAILGUN app `SW_WRONG_DATA_LENGTH`: `Lc` is not a length the instruction accepts. */
+  WRONG_DATA_LENGTH: 0x6a87,
   INS_NOT_SUPPORTED: 0x6d00,
   CLA_NOT_SUPPORTED: 0x6e00,
   APP_NOT_OPEN: 0x6e01,
@@ -42,11 +48,14 @@ export const StatusWord = {
   /** BOLOS: returned by OPEN_APP when the requested application is not installed. */
   APP_NOT_FOUND: 0x6807,
   /**
-   * RAILGUN-app-specific: observed on CLEAR_SIGN sub-commands sent out of order or
-   * without an active session (device probe, 2026-07-24). Best-effort — the exact
-   * meaning is not documented; confirm with the firmware author.
+   * RAILGUN app `SW_BAD_STATE`: the instruction arrived in the wrong session state —
+   * e.g. a CLEAR_SIGN sub-command out of order or without an active session.
    */
+  BAD_STATE: 0xb007,
+  /** @deprecated Use {@link StatusWord.BAD_STATE} (same value, `SW_BAD_STATE` in the firmware). */
   RAILGUN_CLEAR_SIGN_STATE: 0xb007,
+  /** RAILGUN app `SW_SIGNATURE_FAIL`: on-device signing or key derivation failed. */
+  SIGNATURE_FAIL: 0xb008,
 } as const;
 
 export type StatusWord = (typeof StatusWord)[keyof typeof StatusWord];

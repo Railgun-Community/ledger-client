@@ -3,6 +3,42 @@
 All notable changes to `@railgun-community/ledger-client` are documented here. This
 project is pre-1.0 and experimental; expect breaking changes on minor versions.
 
+## 0.4.3 — unreleased
+
+### Changed
+
+- **The bundled RAILGUN app is the 0.0.2 production build** (was 0.0.1). The firmware moved
+  to a new source repository, and its first production release (`MODE=prod`, debug
+  instructions compiled out) is app version `0.0.2`. The "1.6.0" / "1.6.1" in firmware file
+  names is the **device OS** a build targets, not the app version: the previous bundle was app
+  0.0.1 built for device OS 1.6.1, the new one is built for 1.6.0, and both use Ledger API
+  level 26, so either loads on any 1.6.x device. Bundles now live at
+  `apps/{device OS}/{target}/{app version}/` (`apps/1.6.x/{nanosp,flex}/0.0.2/`). The Nano S
+  Plus and Flex bundles are the release's binaries byte for byte, pinned to its published
+  SHA-256 sums. Every APDU the SDK sends is unchanged and matches the 0.0.2 handlers.
+
+### Fixed
+
+- **Clear-sign accepts 4 inputs.** The device allows up to 4 inputs and 3 outputs with
+  `n + m ≤ 5`; the host capped inputs at 3 and rejected a legal 4-in / 1-out transact.
+- **Dual-tx clear-sign checks output roles before opening a session.** The device reviews
+  both transactions as one: tx 0 must end in a transfer and tx 1 in the broadcaster fee. It
+  accepts an unshield as tx 0's final output but then shows the 20-byte unshield address as
+  a garbled 0zk "To" line, and it shows only tx 1's chainId.
+  It also signs a fee transaction whose bound params say unshield.
+  `signClearSignMultiTransact` now requires, before any APDU, tx 0 = `[change?, transfer]`
+  and tx 1 = `[change?, broadcaster]`, `unshield: false` on both, and the same chainId and
+  adapt fields.
+- **`sign()` fails closed when the echoed hash is missing.** The app always echoes the
+  signed hash after the signature (129-byte reply). A 97-byte reply skipped the tamper
+  check; it now throws `SIGN_INVALID_RESPONSE`.
+- **The app's status words have names and messages.** `0xB007` is the app's generic
+  `SW_BAD_STATE`, not only a clear-sign error; `StatusWord.BAD_STATE` is added and
+  `RAILGUN_CLEAR_SIGN_STATE` is kept as a deprecated alias. Also added: `SIGNATURE_FAIL`
+  (`0xB008`), `WRONG_P1P2` (`0x6A86`) and `WRONG_DATA_LENGTH` (`0x6A87`) — the app sends
+  these instead of the ISO `0x6B00` / `0x6700`. `0x6A80`, `0x6A86`, `0x6A87`, `0x6D00`,
+  `0x6E00` and `0xB008` now get specific messages; error codes are unchanged.
+
 ## 0.4.2 — 2026-10-12
 
 ### Fixed
